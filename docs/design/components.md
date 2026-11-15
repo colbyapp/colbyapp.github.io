@@ -19,8 +19,8 @@ Formatting rules for every component:
 
 ## TempGraph (Main, History)
 - Anatomy: card (`color.card`, `radius.card`); state/time label above plot; plot with grid, y and x labels (`type.axis`), target line + right-edge label, 3 series (`stroke.series`).
-- Interaction: pointer move = scrub (vertical line, ringed dot per series, ReadoutRow + label update); leave = live/end. Keyboard: focusable; ←/→ step 1 sample, Shift = 10. Drag/scroll = pan/zoom (pauses Live).
-- States: live; scrubbing; All 8 sensors (others `sensor.other`, 1.5 px, end labels T1–T8); gap (break); backfilling (hatched region + progress); stale (lines stop).
+- Interaction: pointer move = scrub (vertical line, ringed dot per series, ReadoutRow + label update); leave = live/end. Keyboard: focusable; ←/→ step 1 sample, Shift = 10.
+- States: live; scrubbing; T1–T8 lines (role sensors in their colors, others `sensor.other`, 1.5 px, end labels T1–T8); gap (break); backfilling (hatched region + progress); stale (lines stop).
 - Data: downsampled to 2× pixel width, min/max per bucket.
 - Rendering: SwiftUI `Canvas` / Win2D `CanvasControl`.
 

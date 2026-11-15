@@ -24,7 +24,7 @@ struct GraphModelTests {
     @Test func yAxisFitsTheReadingsAndTarget() {
         // Readings run from about 20 °C to 100 °C ambient; the target 95 °C is inside that.
         let now = start.addingTimeInterval(600)
-        let m = GraphModel(series: series(Array(0...120)), target: 95, range: .all, now: now, width: 400, unit: .celsius)
+        let m = GraphModel(series: series(Array(0...120)), target: 95, now: now, width: 400, unit: .celsius)
         #expect(m.yMin <= 20 && m.yMin >= 0)
         #expect(m.yMax >= 100 && m.yMax <= 120)
         #expect((m.yMax - m.yMin) / m.yStep <= 6)
@@ -42,21 +42,21 @@ struct GraphModelTests {
     }
 
     @Test func missingSamplesBreakTheLine() {
-        let m = GraphModel(series: series(Array(0...10) + Array(30...40)), target: nil, range: .all,
+        let m = GraphModel(series: series(Array(0...10) + Array(30...40)), target: nil,
                            now: start.addingTimeInterval(200), width: 400, unit: .celsius)
         #expect(m.points.count == 22)
         #expect(m.breaks == [11])
     }
 
-    @Test func liveShowsTheLastThirtyMinutes() {
+    @Test func theGraphShowsTheWholeCook() {
         let now = start.addingTimeInterval(4 * 3600)
-        let m = GraphModel(series: series(Array(0...2880)), target: nil, range: .live, now: now, width: 600, unit: .celsius)
+        let m = GraphModel(series: series(Array(0...2880)), target: nil, now: now, width: 600, unit: .celsius)
         #expect(m.end == now)
-        #expect(m.start == now.addingTimeInterval(-1800))
+        #expect(m.start == m.points.first?.time)
     }
 
     @Test func nearestPicksTheClosestPoint() throws {
-        let m = GraphModel(series: series(Array(0...10)), target: nil, range: .all,
+        let m = GraphModel(series: series(Array(0...10)), target: nil,
                            now: start.addingTimeInterval(50), width: 400, unit: .celsius)
         let p = try #require(m.nearest(start.addingTimeInterval(12)))
         #expect(p.time == start.addingTimeInterval(10))

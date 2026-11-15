@@ -205,6 +205,7 @@ dialog .list { display: grid; gap: 8px; }
 dialog .item { display: flex; align-items: center; gap: 10px; background: var(--raised); border-radius: 12px; padding: 10px 12px; }
 dialog .item .grow { flex: 1; min-width: 0; }
 dialog .note { color: var(--muted); font-size: 13px; margin: 0; }
+dialog .note a { color: var(--text2); }
 dialog .error { color: #ff9a9d; font-size: 14px; margin: 0; }
 dialog fieldset { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; display: grid; gap: 10px; }
 dialog legend { color: var(--text2); font-weight: 600; padding: 0 6px; }

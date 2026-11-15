@@ -7,7 +7,6 @@ import SwiftUI
 public struct MainView: View {
     @Bindable var model: AppModel
     var tryDemo: (() -> Void)?
-    @State private var range: GraphRange = .live
     @State private var scrub: ScrubPoint?
 
     public init(model: AppModel, tryDemo: (() -> Void)? = nil) {
@@ -38,13 +37,6 @@ public struct MainView: View {
         .background(P.window)
         .preferredColorScheme(.dark)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Range", selection: $range) {
-                    ForEach(GraphRange.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 220)
-            }
             ToolbarItem(placement: .primaryAction) {
                 Picker("Units", selection: $model.unit) {
                     Text("°F").tag(TemperatureUnit.fahrenheit)
@@ -123,7 +115,7 @@ public struct MainView: View {
                     .font(F.label).foregroundStyle(P.text2)
                     .frame(maxWidth: .infinity)
                 TempGraph(series: model.series, target: prediction.flatMap { $0.mode == .none ? nil : $0.setpoint },
-                          range: range, now: model.now, format: format, scrub: $scrub)
+                          now: model.now, format: format, scrub: $scrub)
                     .frame(minHeight: 160)
                     .layoutPriority(-1)
             }

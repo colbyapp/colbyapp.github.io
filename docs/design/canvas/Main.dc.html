@@ -15,9 +15,6 @@ body{margin:0}
 a{color:#f5f5f5}a:hover{color:#ffffff}
 .c{--bg:#000000;--card:#161616;--card2:#1f1f1f;--line:#2c2c2c;--grid:#2a2a2a;--text:#f5f5f5;--text2:#c7c7c7;--muted:#9b9b9b;--core:#4ea1f7;--surf:#ffb81c;--amb:#f5701f;--ready:#5fd17a;--critical:#e5484d;--criticalBg:#3a1214}
 .num{font-family:'Barlow Condensed','Barlow',system-ui,sans-serif;font-variant-numeric:tabular-nums}
-.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{background:transparent;color:var(--text2);border:0;padding:8px 14px;font:500 14px 'Barlow',system-ui,sans-serif;cursor:pointer;min-height:36px}
-.seg button.on{background:var(--card2);color:var(--text)}
 .btn{background:var(--card2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font:600 14px 'Barlow',system-ui,sans-serif;cursor:pointer;min-height:36px;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
 .btn.primary{background:var(--text);color:#000000;border-color:var(--text)}
 .pill{display:inline-block;border-radius:999px;padding:3px 14px;font:600 15px 'Barlow',system-ui,sans-serif;color:#000000}
@@ -35,12 +32,10 @@ a{color:#f5f5f5}a:hover{color:#ffffff}
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffb81c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg>
 <span style="font-weight: 700; font-size: 18px">Colby</span>
 </div>
-<div class="seg" role="group" aria-label="Time range"><button type="button">Live</button><button type="button">1h</button><button type="button" class="on" aria-pressed="true">4h</button><button type="button">All</button></div>
-<div class="seg" role="group" aria-label="Sensors shown"><button type="button" class="on" aria-pressed="true">Core · Surface · Ambient</button><button type="button">All 8</button></div>
 <div style="flex: 1 1 20px"></div>
 <button type="button" class="btn" aria-label="Active alerts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg><span class="num">{{alertCount}}</span></button>
 <a class="btn" href="Kitchen.dc.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>Kitchen mode</a>
-<a class="btn" href="Settings.dc.html" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M4.9 4.9l2.1 2.1"></path><path d="M17 17l2.1 2.1"></path><path d="M2 12h3"></path><path d="M19 12h3"></path><path d="M4.9 19.1L7 17"></path><path d="M17 7l2.1-2.1"></path></svg></a>
+<a class="btn" href="Settings.dc.html" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></a>
 </header>
 
 <sc-if value="{{alerting}}" hint-placeholder-val="{{ false }}">
