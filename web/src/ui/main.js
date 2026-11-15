@@ -19,17 +19,14 @@ import { isCooking } from '../core/alerts.js';
 const $ = (id) => document.getElementById(id);
 const esc = fmt.escapeHtml;
 const HOUR = 3_600_000;
-const RANGES = { live: 30 * 60_000, '1h': HOUR, '4h': 4 * HOUR };
 
 const defaultUnit = () => (/^en-(US|LR|MM)|^en$/.test(navigator.language) ? 'F' : 'C');
 
 const state = {
   unit: prefs.get('unit', defaultUnit()),
   primaryTime: prefs.get('primaryTime', 'relative'),
-  range: prefs.get('range', 'all'),
-  sensorMode: prefs.get('sensorMode', 'csa'),
-  /** Graph lines turned off from the sensor tiles: 'core', 'surface', 'ambient', 't0'…'t7'. */
-  hiddenLines: new Set(prefs.get('hiddenLines', [])),
+  /** Graph lines turned off from the sensor tiles: 't0'…'t7'. */
+  hiddenLines: new Set(prefs.get('hiddenLines', []).filter((k) => /^t[0-7]$/.test(k))),
   names: prefs.get('names', {}),
   selected: null,
   scrub: null,
@@ -205,8 +202,6 @@ function render() {
 }
 
 function renderToolbar() {
-  for (const b of $('range').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.range === state.range));
-  for (const b of $('sensors').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.mode === state.sensorMode));
   const firing = state.active.filter((a) => a.state === 'firing').length;
   $('alerts-button').hidden = state.active.length === 0;
   $('alerts-button').classList.toggle('alerting', firing > 0);
@@ -371,11 +366,8 @@ function graphWindow() {
   if (state.viewSession) {
     return { from: samples[0]?.time ?? now - HOUR, to: samples.at(-1)?.time ?? now };
   }
-  if (state.range === 'all') {
-    const start = app.history.currentSession(state.selected)?.startedAt ?? samples[0]?.time ?? now - 30 * 60_000;
-    return { from: Math.min(start, now - 10 * 60_000), to: now };
-  }
-  return { from: now - RANGES[state.range], to: now };
+  const start = app.history.currentSession(state.selected)?.startedAt ?? samples[0]?.time ?? now - 30 * 60_000;
+  return { from: Math.min(start, now - 10 * 60_000), to: now };
 }
 
 function updateGraph() {
@@ -385,7 +377,7 @@ function updateGraph() {
   const target = snap?.prediction && snap.prediction.mode !== 'none' ? snap.prediction.setpoint
     : state.samples.at(-1)?.setpoint || null;
   graph.set({
-    samples: state.samples, ...graphWindow(), target, unit: state.unit, mode: state.sensorMode, hidden: state.hiddenLines,
+    samples: state.samples, ...graphWindow(), target, unit: state.unit, hidden: state.hiddenLines,
     period: session?.samplePeriodMs ?? 5000,
   });
   const empty = $('graph-empty');
@@ -463,12 +455,10 @@ function renderInspector() {
   const sensors = SENSORS.map((s, i) => {
     const role = roles[s];
     const hot = snap.overheating.includes(s);
-    const line = sensorLine(i, role);
-    const off = line != null && state.hiddenLines.has(line);
-    const plotted = line != null && !off;
+    const off = state.hiddenLines.has(seriesId(i));
+    const plotted = !off;
     const label = `${s.toUpperCase()}${role ? ` (${fmt.channelName(role)})` : ''}`;
-    const title = line == null ? `Show all 8 sensors on the graph, including ${s.toUpperCase()}`
-      : `${plotted ? 'Hide' : 'Show'} ${label} on the graph`;
+    const title = `${plotted ? 'Hide' : 'Show'} ${label} on the graph`;
     return `<button type="button" class="sensor ${role ?? ''}${hot ? ' hot' : ''}${off ? ' off' : ''}" data-sensor="${i}" data-role="${role ?? ''}"
       aria-pressed="${plotted}" title="${esc(title)}"><div class="label">${s.toUpperCase()}</div><div class="t">${fmt.temp(snap.temperatures[i], state.unit)}</div>${role ? `<span class="tag">${fmt.channelName(role)}</span>` : ''}</button>`;
   }).join('');
@@ -493,21 +483,10 @@ function renderInspector() {
     </dl>`;
 }
 
-/** The graph line a sensor tile controls: its role in core/surface/ambient mode, its own line in all-sensors mode. */
-function sensorLine(i, role) {
-  if (state.sensorMode === 'all') return seriesId(i);
-  return role ?? null;
-}
-
-/** A sensor tile was clicked: hide or show its line. A sensor not plotted in this mode switches to all sensors. */
+/** A sensor tile was clicked: hide or show its line. */
 function toggleSensorLine(tile) {
-  const i = Number(tile.dataset.sensor);
-  const line = sensorLine(i, tile.dataset.role || null);
-  if (line == null) {
-    state.sensorMode = 'all';
-    prefs.set('sensorMode', 'all');
-    state.hiddenLines.delete(seriesId(i));
-  } else if (state.hiddenLines.has(line)) state.hiddenLines.delete(line);
+  const line = seriesId(Number(tile.dataset.sensor));
+  if (state.hiddenLines.has(line)) state.hiddenLines.delete(line);
   else state.hiddenLines.add(line);
   prefs.set('hiddenLines', [...state.hiddenLines]);
   invalidate();
@@ -999,20 +978,6 @@ function startDemo() {
 
 // MARK: Events
 
-$('range').addEventListener('click', (e) => {
-  const r = e.target.closest('button')?.dataset.range;
-  if (!r) return;
-  state.range = r;
-  prefs.set('range', r);
-  invalidate();
-});
-$('sensors').addEventListener('click', (e) => {
-  const m = e.target.closest('button')?.dataset.mode;
-  if (!m) return;
-  state.sensorMode = m;
-  prefs.set('sensorMode', m);
-  invalidate();
-});
 $('alerts-button').addEventListener('click', alertsDialog);
 $('history-button').addEventListener('click', historyDialog);
 $('devices-button').addEventListener('click', devicesDialog);

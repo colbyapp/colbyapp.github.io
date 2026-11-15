@@ -66,10 +66,6 @@ button { cursor: pointer; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; margin-right: 8px; }
 .brand-icon { width: 32px; height: 32px; margin: -4px 0; }
 .spacer { flex: 1; }
-.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-control); overflow: hidden; }
-.segmented button { background: none; border: 0; padding: 8px 14px; font-size: 14px; font-weight: 500; color: var(--text2); min-height: 36px; }
-.segmented button + button { border-left: 1px solid var(--line); }
-.segmented button[aria-pressed='true'] { background: var(--raised); color: var(--text); }
 .tool {
   display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 14px;
   background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-control); font-weight: 600; font-size: 14px;
@@ -236,9 +232,6 @@ dialog .alarm-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10
 @media (max-width: 640px) {
   .toolbar { padding: 10px 16px; gap: 8px; }
   .probe-view { padding: 16px; }
-  .segmented button { padding: 6px 10px; }
-  #sensors button:first-child { font-size: 0; }
-  #sensors button:first-child::after { content: 'C·S·A'; font-size: 14px; }
   .tool { padding: 6px 10px; }
   .title-row h1 { font-size: 24px; }
   .countdown { font-size: 44px; }
