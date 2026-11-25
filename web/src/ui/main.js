@@ -285,8 +285,8 @@ function renderReconnectBand() {
     const names = lost.map((x) => deviceLabel(x).replace(/ \(identifying…\)$/, ''));
     band.querySelector('.title').textContent = `Chrome lost track of ${names.join(' and ')}`;
     band.querySelector('.detail').textContent = lost.length > 1
-      ? 'Pick them again to reconnect, one at a time. Your cook and its history are kept.'
-      : 'Pick it again to reconnect. Your cook and its history are kept.';
+      ? 'Pick them again to reconnect, one at a time. They can take a few seconds to show in the list. Your cook and its history are kept.'
+      : 'Pick it again to reconnect. It can take a few seconds to show in the list. Your cook and its history are kept.';
     action.dataset.band = 'pick';
     action.textContent = 'Pick again';
     hint.hidden = true;

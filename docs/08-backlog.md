@@ -54,6 +54,10 @@ Status: `open` (not started), `blocked` (needs info), `doing`, `done`.
    (opens the chooser). Picking a device Colby already has reuses its record with the new handle and connects at once,
    keeping the cook and history. Backoff is now ×1.5 from 1 s, at most 30 s; the band shows no try count.
    **To confirm:** sleep test again, then Pick again for each device.
+5. Second sleep test: this time every GATT connect hung until `connect timed out` (15 s), for 17 min, on both devices.
+   Picking the devices again in the chooser brought them back; they took a while to show in the list. So after a wake
+   the band offers Pick again for any device still down after 30 s, whatever the error, and says the device can take a
+   few seconds to show.
 
 **Next:** with the probe showing in bluetooth-internals, open an `acceptAllDevices` chooser from the DevTools console. If
 it lists the probe, do F-3 as a "Show all devices" chooser (`acceptAllDevices` plus `optionalManufacturerData: [0x09C7]`);
