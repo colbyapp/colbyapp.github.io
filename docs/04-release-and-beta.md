@@ -2,6 +2,9 @@
 
 Both apps ship only through their store. Every release goes through a beta stage first.
 
+The web app is separate: it ships to GitHub Pages when a `web-vX.Y.Z` tag is pushed, with no beta stage. Steps are in
+`web/README.md` → "Ship a release". Its tags never match the `vX.Y.Z` pattern below.
+
 ## 1. Pipeline
 
 ```

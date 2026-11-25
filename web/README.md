@@ -21,15 +21,38 @@ Web Bluetooth needs a secure context: HTTPS, or `localhost`. Opening `index.html
 
 ### GitHub Pages
 
-`.github/workflows/web.yml` tests and builds on every change to `web/` and deploys `web/dist` from `main` (or from
-"Run workflow" in the Actions tab). One-time setup: Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+`.github/workflows/web.yml` tests and builds on every push and pull request that changes `web/`. It deploys `web/dist`
+only when you ship a release (below). Merging to `main` does not deploy, so several PRs can go out together.
+
+One-time setup:
+1. Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+2. Settings → Environments → github-pages → Deployment branches and tags: add a **tag** rule `web-v*`. Without it, tag
+   deploys fail with "not allowed to deploy to github-pages".
+
 The site then lives at `https://<owner>.github.io/<repo>/`; all paths are relative, so the sub-path needs no config.
+
+### Ship a release
+
+Releases are git tags named `web-vX.Y.Z`. (Plain `vX.Y.Z` tags are for the desktop apps, see
+`docs/04-release-and-beta.md`.) Pushing the tag deploys that exact commit.
+
+| Task | Command |
+|---|---|
+| See what is unreleased | `git fetch --tags && git log --oneline $(git describe --tags --match 'web-v*' --abbrev=0 origin/main)..origin/main -- web` |
+| Ship `main` | `gh release create web-v1.2.0 --target main --generate-notes` (creates the tag and a release page listing the merged PRs) |
+| Ship without a release page | `git tag web-v1.2.0 origin/main && git push origin web-v1.2.0` |
+| Watch the deploy | `gh run watch $(gh run list --workflow web.yml --event push --limit 1 --json databaseId --jq '.[0].databaseId')` |
+| Roll back | `gh workflow run web.yml --ref web-v1.1.0` (redeploys the older tag) |
+| Deploy a branch by hand (testing only) | `gh workflow run web.yml --ref <branch>`, or "Run workflow" in the Actions tab |
+
+Version numbers: bump Z for fixes, Y for features, X for changes that break saved data or settings. A hand deploy from a
+branch is not a release, so ship a tag afterwards to get the site back to a known version.
 
 Limits to know:
 - A private repository can use Pages only on a paid plan (GitHub Pro, Team or Enterprise); on GitHub Free the repo must
   be public.
-- The `github-pages` environment only accepts deployments from the default branch unless you add other branches under
-  Settings → Environments → github-pages.
+- The `github-pages` environment accepts only the branches and tags its rules allow (currently `main`; add `web-v*` as
+  above). A hand deploy from another branch also needs a rule for that branch.
 - Pages sets `Cache-Control: max-age=600` and cannot be configured; hashed asset names and the service worker make that
   irrelevant for repeat visits.
 
