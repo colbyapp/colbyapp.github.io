@@ -87,6 +87,28 @@ button { cursor: pointer; }
 @keyframes pulse { from { filter: brightness(1); } to { filter: brightness(1.18); } }
 @media (prefers-reduced-motion: reduce) { .alert-band { animation: none; } }
 
+/* Reconnect band: over the top of the page (a manual popover, so also above dialogs) while devices reconnect */
+.reconnect-band {
+  position: fixed; inset: 0 0 auto 0; width: 100%; margin: 0; z-index: 40;
+  background: var(--warning-bg); color: var(--text); border: 0; border-bottom: 1px solid var(--warning);
+  padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+.reconnect-band:popover-open { display: flex; }
+.reconnect-band .grow { flex: 1; min-width: 220px; }
+.reconnect-band .title { font-weight: 600; }
+.reconnect-band .detail { color: var(--text2); font-size: 14px; font-variant-numeric: tabular-nums; }
+.reconnect-band .hint { color: var(--warning); font-size: 14px; margin-top: 2px; }
+.reconnect-band button { background: var(--warning); color: #000; border: 0; border-radius: var(--r-control); padding: 8px 14px; font-weight: 600; min-height: 40px; }
+.reconnect-band button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.spinner {
+  flex: none; width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(250,178,25,.3); border-top-color: var(--warning); animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+@media (max-width: 640px) { .reconnect-band { padding: 10px 16px; } }
+
 /* Layout */
 main { flex: 1; display: flex; min-height: 0; }
 .probe-view { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; padding: 20px; min-height: 0; }
