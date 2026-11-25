@@ -12,6 +12,7 @@ Planning and documentation only. No code yet.
 | [05-test-strategy.md](05-test-strategy.md) | Test layers, parity traces, replays, hardware matrix, emulator rig |
 | [06-ux-plan.md](06-ux-plan.md) | UX decisions, screens, graph spec, alerts, kitchen mode, design system, accessibility |
 | [07-hardware-capture.md](07-hardware-capture.md) | Connecting a Mac to real devices (no OS pairing), `colby-capture` spec, M0 capture order |
+| [08-backlog.md](08-backlog.md) | Feature requests and investigations not yet scheduled |
 | [design/](design/) | `tokens.json`, `components.md`, canvas source (`canvas/`), render tools (`tools/`), screenshots |
 | [HANDOFF.md](HANDOFF.md) | Current state and how to continue in a new session |
 | [../web/README.md](../web/README.md) | Web version: static files, Web Bluetooth, feature support table |
