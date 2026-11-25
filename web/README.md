@@ -40,7 +40,7 @@ Releases are git tags named `web-vX.Y.Z`. (Plain `vX.Y.Z` tags are for the deskt
 |---|---|
 | See what is unreleased | `git fetch --tags && git log --oneline $(git describe --tags --match 'web-v*' --abbrev=0 origin/main)..origin/main -- web` |
 | Ship `main` | `gh release create web-v1.2.0 --target main --generate-notes` (creates the tag and a release page listing the merged PRs) |
-| Ship without a release page | `git tag web-v1.2.0 origin/main && git push origin web-v1.2.0` |
+| Ship without a release page | `git tag web-v1.2.0 origin/main && git push origin web-v1.2.0` (the app still shows the notes, but "See all changes" will not list this version) |
 | Watch the deploy | `gh run watch $(gh run list --workflow web.yml --event push --limit 1 --json databaseId --jq '.[0].databaseId')` |
 | Roll back | `gh workflow run web.yml --ref web-v1.1.0` (redeploys the older tag) |
 | Deploy a branch by hand (testing only) | `gh workflow run web.yml --ref <branch>`, or "Run workflow" in the Actions tab |
@@ -48,11 +48,24 @@ Releases are git tags named `web-vX.Y.Z`. (Plain `vX.Y.Z` tags are for the deskt
 Version numbers: bump Z for fixes, Y for features, X for changes that break saved data or settings. A hand deploy from a
 branch is not a release, so ship a tag afterwards to get the site back to a known version.
 
+#### What's new (Settings)
+
+The bottom of Settings shows "What's new in X.Y.Z": the PRs merged since the previous `web-v*` tag, and a "See all
+changes" link to the GitHub Releases page. A build that is not from a tag (local, branch, PR) shows "Development build".
+
+- The text comes from GitHub's generated release notes, the same text `gh release create --generate-notes` puts on the
+  release page. On a tag, the `notes` job in `web.yml` fetches it and `build.mjs` bakes it into the bundle
+  (`tools/releaseNotes.mjs`), so the app still makes no requests to other sites.
+- Each line is a PR title, so **write PR titles for users**: what changed, not how. A leading `Web:` is dropped.
+- PRs titled `Mac:`, `macOS:`, `Windows:` or `CI:` are left out of the app's list (they still appear on the release
+  page).
+- Label a PR `skip-changelog` to leave it out of both (`.github/release.yml`), e.g. CI or docs-only changes.
+
 Limits to know:
 - A private repository can use Pages only on a paid plan (GitHub Pro, Team or Enterprise); on GitHub Free the repo must
   be public.
-- The `github-pages` environment accepts only the branches and tags its rules allow (currently `main`; add `web-v*` as
-  above). A hand deploy from another branch also needs a rule for that branch.
+- The `github-pages` environment accepts only the branches and tags its rules allow (currently branch `main` and tags
+  `web-v*`). A hand deploy from another branch also needs a rule for that branch.
 - Pages sets `Cache-Control: max-age=600` and cannot be configured; hashed asset names and the service worker make that
   irrelevant for repeat visits.
 

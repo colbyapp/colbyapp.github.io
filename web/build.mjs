@@ -10,8 +10,16 @@ import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFi
 import { gzipSync } from 'node:zlib';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { releaseInfo } from './tools/releaseNotes.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
+
+// On a release tag CI sets COLBY_RELEASE_TAG and COLBY_RELEASE_NOTES_B64 (GitHub's generated notes); Settings shows them.
+const release = releaseInfo({
+  tag: process.env.COLBY_RELEASE_TAG,
+  notesBody: Buffer.from(process.env.COLBY_RELEASE_NOTES_B64 ?? '', 'base64').toString('utf8'),
+});
+console.log(release ? `release ${release.version}: ${release.notes.length} change(s)` : 'not a release build');
 const out = join(root, 'dist');
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out);
@@ -32,6 +40,7 @@ const result = await build({
   metafile: true,
   legalComments: 'none',
   logLevel: 'warning',
+  define: { __COLBY_RELEASE__: JSON.stringify(release) },
 });
 
 const outputs = Object.keys(result.metafile.outputs).map((p) => relative(out, join(root, p)));

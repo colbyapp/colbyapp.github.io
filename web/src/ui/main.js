@@ -791,6 +791,22 @@ async function exportCsv(key) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// Set by build.mjs on a release tag: `{version, date, notes: [{title, url}]}`. The unbuilt source has no release.
+const RELEASE = typeof __COLBY_RELEASE__ === 'undefined' ? null : __COLBY_RELEASE__;
+const RELEASES_URL = 'https://github.com/colbyapp/colbyapp.github.io/releases';
+
+/** Settings' last section: what changed in this version, and a link to every release on GitHub. */
+function changelogSection() {
+  const all = `<p class="note"><a href="${RELEASES_URL}" target="_blank" rel="noopener">See all changes</a></p>`;
+  if (!RELEASE) return `<fieldset><legend>What's new</legend><p class="note">Development build (not a release).</p>${all}</fieldset>`;
+  const date = new Date(`${RELEASE.date}T12:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const list = RELEASE.notes.length
+    ? `<ul class="changes">${RELEASE.notes.map((n) => `<li>${esc(n.title)}</li>`).join('')}</ul>`
+    : '<p class="note">Small fixes.</p>';
+  return `<fieldset><legend>What's new in ${esc(RELEASE.version)}</legend>
+    <p class="note">Released ${esc(date)}</p>${list}${all}</fieldset>`;
+}
+
 function settingsDialog() {
   const caps = ble.capabilities();
   openDialog(`<h2>Settings</h2>
@@ -815,6 +831,7 @@ function settingsDialog() {
       <p class="note">Items marked – need chrome://flags/#enable-experimental-web-platform-features.</p>
     </fieldset>
     <p class="note">Colby is open source: <a href="https://github.com/colbyapp/colbyapp.github.io" target="_blank" rel="noopener">github.com/colbyapp/colbyapp.github.io</a></p>
+    ${changelogSection()}
     <div class="row"><button class="btn danger" data-do="wipe">Delete all data</button><button class="btn" data-do="close">Done</button></div>`, {
     close: closeDialog,
     test: () => sound.test('ready'),
