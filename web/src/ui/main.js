@@ -926,19 +926,25 @@ function announceIdentified(devices) {
   for (const id of announced) if (!app.devices.has(id)) announced.delete(id);
 }
 
+/** Shown when the chooser closes with nothing picked (backlog F-2): the device may be asleep or held by Chrome. */
+const CHOOSER_EMPTY_HINT = 'Device not listed? Take the probe out of its charger to wake it. Still missing? Open '
+  + 'chrome://bluetooth-internals, click Forget on the Combustion device, close other Colby tabs, and try again.';
+
 /** Opens the browser's chooser and adds the picked device. Resolves true when a device was added. */
 async function connectDevice() {
   if (!ble.capabilities().bluetooth) {
     onboarding.open('bluetooth');
     return false;
   }
+  releaseStaleLinks();
   let device;
   try {
     device = await ble.requestDevice();
   } catch (e) {
     // NotFoundError: the chooser was cancelled. SecurityError / NotAllowedError: Bluetooth blocked for the site.
     if (e?.name === 'SecurityError' || e?.name === 'NotAllowedError') onboarding.open('bluetooth');
-    else if (e?.name !== 'NotFoundError') toast(`Could not open the device chooser: ${e?.message ?? e}`);
+    else if (e?.name === 'NotFoundError') toast(CHOOSER_EMPTY_HINT, 12000);
+    else toast(`Could not open the device chooser: ${e?.message ?? e}`);
     return false;
   }
   addBleDevice(device);
@@ -964,7 +970,16 @@ async function identify(device, connection, isProbe) {
   return { serial: fromAd?.kind === 'node' ? fromAd.serial : ble.advertisedName(device) || ble.pseudoSerial(device.id), productType };
 }
 
+/** Browser Bluetooth devices by id, so their GATT links can be released (page hide, chooser). */
+const bleDevices = new Map();
+
+/** Releases Chrome's link to every device Colby has no live link to; a stale one can hide it from the chooser (I-1). */
+function releaseStaleLinks() {
+  for (const [id, device] of bleDevices) if (!app.devices.get(id)?.link) ble.releaseDevice(device);
+}
+
 function addBleDevice(device) {
+  bleDevices.set(device.id, device);
   app.addDevice({
     id: device.id,
     name: ble.advertisedName(device) ?? 'Combustion device',
@@ -1140,6 +1155,12 @@ const lifecycle = watchLifecycle({
   },
 });
 guardUnload(cookAtRisk);
+// Closing, reloading or leaving the page releases every device, so Chrome does not hold a link that hides it from
+// the next chooser (backlog F-1). This fires only when the page goes away (not on a tab switch), and the link ends
+// with the page anyway, so it adds no connect cycles.
+addEventListener('pagehide', () => {
+  for (const device of bleDevices.values()) ble.releaseDevice(device);
+});
 
 // Acknowledge / Snooze pressed on a notification (service worker, sw.js).
 navigator.serviceWorker?.addEventListener('message', (e) => {

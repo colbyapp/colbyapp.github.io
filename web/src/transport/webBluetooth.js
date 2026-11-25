@@ -143,12 +143,27 @@ export class WebBleConnection {
   #disconnectHandlers = new Set();
   #closing = false;
 
+  /**
+   * Connects. Colby calls this only for a device it has no live link to, so a GATT connection Chrome still reports is
+   * stale (typically left from before the computer slept) and is dropped first: a held connection can keep the device
+   * out of new scans and the chooser (docs/08-backlog.md, I-1). A connect that times out is cancelled the same way, so
+   * it cannot finish later and hold the device.
+   */
   static async connect(device, timeoutMs = 15_000) {
-    const server = await Promise.race([
-      device.gatt.connect(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('connect timed out')), timeoutMs)),
-    ]);
-    return new WebBleConnection(device, server);
+    if (device.gatt?.connected) releaseDevice(device);
+    let timer;
+    try {
+      const server = await Promise.race([
+        device.gatt.connect(),
+        new Promise((_, reject) => (timer = setTimeout(() => reject(new Error('connect timed out')), timeoutMs))),
+      ]);
+      return new WebBleConnection(device, server);
+    } catch (e) {
+      releaseDevice(device);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   constructor(device, server) {
@@ -157,6 +172,9 @@ export class WebBleConnection {
     this.id = device.id;
     this.name = advertisedName(device) ?? 'Combustion device';
     this.onGattDisconnected = () => {
+      // Dropping a stale link (connect) fires this event later, possibly after this new connection is up. While the
+      // browser still says connected and close() was not called, the event is for the old link: ignore it.
+      if (!this.#closing && device.gatt?.connected) return;
       device.removeEventListener('gattserverdisconnected', this.onGattDisconnected);
       const reason = this.#closing ? 'requested' : 'linkLost';
       for (const fn of [...this.#disconnectHandlers]) fn(reason);
@@ -227,6 +245,18 @@ export class WebBleConnection {
     this.#closing = true;
     if (this.device.gatt.connected) this.device.gatt.disconnect();
     else this.onGattDisconnected();
+  }
+}
+
+/**
+ * Drops the browser's GATT connection to a device, if any. `disconnect()` also cancels a connect still pending, so it
+ * is called whether or not `connected` is set.
+ */
+export function releaseDevice(device) {
+  try {
+    device?.gatt?.disconnect();
+  } catch {
+    /* not connected */
   }
 }
 

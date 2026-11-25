@@ -8,7 +8,7 @@ Status: `open` (not started), `blocked` (needs info), `doing`, `done`.
 
 ### I-1. Web: device chooser finds no devices
 
-- **Status:** blocked. Need to know which step fixed it.
+- **Status:** doing. Fixes for cause 1 are in (below); confirm on hardware after the computer sleeps mid-cook.
 - **Opened:** 2026-11-24
 - **Platform:** web (colbyapp.github.io), Chrome 158.0.8127.88, macOS 26.3
 
@@ -28,19 +28,29 @@ Status: `open` (not started), `blocked` (needs info), `doing`, `done`.
 
 **Fixes this leads to:** F-1 for cause 1, F-2 for both causes, F-3 for cause 2.
 
+**Done (2026-11-25):**
+- F-1: `pagehide` releases every device (`releaseDevice` in `web/src/transport/webBluetooth.js`). It fires only on close, reload or navigation, not on a tab switch, and the link ends with the page anyway, so it adds no connect cycles.
+- F-2: when the chooser closes with nothing picked, a toast says to wake the probe, then Forget the device in `chrome://bluetooth-internals`.
+- Before opening the chooser and before each connect, Colby drops the GATT link Chrome still reports for any device it has no live link to. A connect that times out is cancelled the same way.
+
+**Findings (2026-11-25, 127.0.0.1 server, after the Mac slept):**
+1. The chooser spun on "Scanning" with nothing listed. A first `chrome://bluetooth-internals` scan showed no device with
+   the Probe Status service (`00000100-caab-…`); the strong "Unknown or Unsupported Device" entries had `1805`, `180a`,
+   `180f` and two Apple Continuity services (`9fa480e0-…`, `d0611e78-…`): Apple devices, not the probe.
+2. A later scan did show the probe: `B0:7B:1A:D7:83:C8`, −51 dBm, `00000100-caab-…`. The chooser still listed only the
+   Display already connected (`00:57:36:27:81:11 – Paired`), not the probe. So the probe was in range and seen by Chrome,
+   but did not match the chooser filter: cause 2 is back on the table. (bluetooth-internals may show services from an
+   earlier GATT discovery, not from the advertisement.)
+
+**Next:** with the probe showing in bluetooth-internals, open an `acceptAllDevices` chooser from the DevTools console. If
+it lists the probe, do F-3 as a "Show all devices" chooser (`acceptAllDevices` plus `optionalManufacturerData: [0x09C7]`);
+a name-prefix filter cannot work, because the probe advertises no name.
+
+**Still to check on hardware:** sleep the Mac 10+ minutes mid-cook, wake it, and see whether Colby reconnects by itself and whether the chooser lists the probe. If the chooser is still empty after the release, cause 2 is more likely: do F-3.
+
 ## Feature requests
-
-### F-1. Web: disconnect when the page goes away
-
-- **Status:** open (from I-1)
-- On `pagehide`, call `disconnect()` (`web/src/transport/webBluetooth.js`) for every connected device, so closing, reloading or unloading the tab releases the device. At this time nothing calls it on unload.
-
-### F-2. Web: hint when the chooser closes with no device picked
-
-- **Status:** open (from I-1)
-- On `NotFoundError` (`web/src/ui/main.js`, `requestDevice` catch), show: "Device not listed? Open `chrome://bluetooth-internals`, Forget the Combustion device, and try again." At this time this case is silent.
 
 ### F-3. Web: fallback chooser filter
 
-- **Status:** open (from I-1, do only if cause 2 is confirmed)
-- Add a name-prefix filter next to the `manufacturerData` filter, so a Chrome change to manufacturer-data matching cannot hide every device. First confirm the advertised names of the probe, Display and Booster from captures.
+- **Status:** open (from I-1, do only if cause 2 is confirmed; finding 2 points to it)
+- Offer a "Show all devices" chooser (`acceptAllDevices` with `optionalManufacturerData: [0x09C7]`) when the filtered one finds nothing, so a Chrome change to filter matching cannot hide every device. A name-prefix filter will not work: the probe advertises no name.
