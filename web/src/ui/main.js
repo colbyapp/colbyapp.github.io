@@ -311,11 +311,16 @@ function renderReconnectBand() {
 
 const popovers = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype;
 
+/** How long after a wake a device may stay down before the band offers to pick it again. */
+const PICK_AFTER_WAKE_MS = 30_000;
+
 /**
- * The browser no longer knows the device: Chrome's "Bluetooth Device is no longer in range." from GATT connect. Seen
- * after the Mac slept: every retry fails the same way until the device is picked again in the chooser.
+ * The browser has likely lost the device, so only picking it again in the chooser (a scan) can bring it back. Seen
+ * after the Mac slept, two ways: every GATT connect fails with "Bluetooth Device is no longer in range.", or every one
+ * hangs until "connect timed out". So: that error, or still down 30 s after a wake whatever the error.
  */
-const lostByBrowser = (d) => /no longer in range/i.test(d.error ?? '');
+const lostByBrowser = (d) => d.state === 'reconnecting'
+  && (/no longer in range/i.test(d.error ?? '') || (state.wake != null && Date.now() - state.wake.at >= PICK_AFTER_WAKE_MS));
 
 function setBandShown(band, shown) {
   band.hidden = !shown;
@@ -376,7 +381,8 @@ function renderEmpty() {
 function deviceStateText(d) {
   if (d.state === 'connected') return d.kind === 'node' ? `Connected · ${d.link?.snapshot.probes.length ?? 0} probes` : 'Connected';
   if (d.state === 'reconnecting' && lostByBrowser(d)) return 'Lost by Chrome · use Connect a device to pick it again';
-  if (d.state === 'reconnecting') return `Reconnecting${d.nextRetryAt ? ` in ${Math.max(0, Math.round((d.nextRetryAt - Date.now()) / 1000))} s` : ''}${d.error ? ` (${d.error})` : ''}`;
+  // No countdown: this text is redrawn only when devices change, so a countdown would freeze (it showed "in 0 s").
+  if (d.state === 'reconnecting') return `Reconnecting…${d.error ? ` (${d.error})` : ''}`;
   if (d.state === 'connecting') return 'Connecting…';
   return 'Disconnected';
 }
