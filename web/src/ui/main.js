@@ -97,6 +97,9 @@ app.on('prediction', () => invalidate());
 app.on('devices', (devices) => {
   announceIdentified(devices);
   dropUnsupported(devices);
+  // A direct probe's first session can start while its link is still starting, before `d.link` is set, so the match
+  // on 'sessions' skips it; try again when devices change (e.g. it becomes connected).
+  resolveStandIns();
   // Keep the Devices dialog's states current; it used to show "Connecting…" until reopened.
   if (dialog.open && state.dialog === 'devices') devicesDialog();
   renderReconnectBand();
@@ -1141,7 +1144,11 @@ function resolveStandIns() {
   for (const d of direct) {
     const standIn = d.serial;
     const real = realSerialFor(standIn, candidates, sessionIdOf);
-    if (!real) continue;
+    if (!real) {
+      const hex = (s) => (sessionIdOf(s) >>> 0).toString(16).toUpperCase();
+      console.info(`[Colby] stand-in ${standIn} (session ${hex(standIn)}) not matched; others: ${candidates.map((s) => `${s}=${hex(s)}`).join(', ') || 'none'}`);
+      continue;
+    }
     prefs.set('probeSerials', { ...prefs.get('probeSerials', {}), [d.id]: real });
     if (state.names[standIn]) {
       state.names[real] ??= state.names[standIn];
