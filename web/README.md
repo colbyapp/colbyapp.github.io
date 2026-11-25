@@ -122,7 +122,7 @@ Source: [WebBluetoothCG implementation status](https://github.com/WebBluetoothCG
 | Reconnect after a dropped link | Yes | Backoff 1, 2, 4 … 30 s |
 | Reconnect after reloading the page | Flag only | `getDevices()` needs chrome://flags/#enable-experimental-web-platform-features; otherwise pick the devices again |
 | Passive advertisement scanning (no connection) | Flag only | `requestLEScan()`, same flag |
-| Probe serial and signal strength on a direct connection | Flag only | `watchAdvertisements()`, same flag. Without it a direct probe gets a stand-in ID (see below) |
+| Probe serial and signal strength on a direct connection | Flag only | `watchAdvertisements()`, same flag. Without it a direct probe gets a stand-in ID until a node relays it once (see below) |
 | Alerts with the tab closed or the computer asleep | No | Service workers cannot use Bluetooth |
 | Menu bar / tray icon, widgets, start at login | No | No web APIs |
 
@@ -148,8 +148,10 @@ throttling and Memory Saver were not reproduced in tests.
 Stand-in ID: a direct probe connection does not carry the probe serial (it is only in advertisements), and Web
 Bluetooth blocks the Serial Number characteristic `0x2A25` ("Block access to standardized unique identifiers, for
 privacy reasons", [GATT blocklist](https://github.com/WebBluetoothCG/registries/blob/master/gatt_blocklist.txt)). Without the flag, a directly connected probe is labelled with an ID derived
-from the browser's device ID. If the same probe is also seen through a node, it then shows up twice. Using a node avoids
-this.
+from the browser's device ID. If the same probe is also seen through a node, Colby matches the two by session ID (new
+each time the probe leaves its charger; the node reports it with the real serial), remembers the real serial for that
+device, moves its nickname and reconnects under the real serial (`src/core/identity.js`). Until a node has relayed the
+probe once, a direct-only probe keeps the stand-in ID.
 
 ## Other open-source implementations
 
