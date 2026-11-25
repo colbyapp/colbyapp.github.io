@@ -222,6 +222,8 @@ dialog .alarm-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10
 .kitchen .tile { container-type: size; min-width: 0; min-height: 0; overflow: hidden; background: var(--card); border-radius: var(--r-card); padding: 24px; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; text-align: center; }
 .kitchen .tile.alerting { background: var(--kitchen-alarm); }
 .kitchen .tile .big { font: 600 clamp(64px, min(30cqw, 55cqh), 900px)/0.95 var(--font-num); font-variant-numeric: tabular-nums; }
+/* Alert titles ("5 minutes left") are words, not a short countdown: smaller, so two balanced lines fit the tile. */
+.kitchen .tile .big.text { font-size: clamp(40px, min(13cqw, 24cqh), 400px); line-height: 1.05; text-wrap: balance; overflow-wrap: anywhere; }
 .kitchen .tile .sub { font: 500 clamp(22px, min(6cqw, 10cqh), 120px) var(--font-num); color: var(--text2); }
 .kitchen .tile .head { display: flex; align-items: center; justify-content: center; gap: 0.4em; font-size: clamp(24px, min(3.5cqw, 6cqh), 72px); font-weight: 700; }
 .kitchen .bar { display: flex; justify-content: space-between; align-items: center; }
