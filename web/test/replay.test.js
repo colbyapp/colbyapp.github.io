@@ -1,4 +1,4 @@
-// The web core against real hardware captures in spec/replays (probe fw v2.3.3, Display fw v2.6.0).
+// The web core against real hardware captures in spec/replays (probe fw v2.3.3 and v2.4.1, Display fw v2.6.0 and v2.6.2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FakeClock } from '../src/core/support.js';
@@ -109,3 +109,20 @@ for (const name of ['out-of-range-return', 'verify-fixes', 'verify-node-fixes', 
     assert.ok(app.store.snapshot(PROBE), 'probe seen');
   });
 }
+
+test('fw241-display262: probe fw v2.4.1 through Display fw v2.6.2 relays the 105 B status with its session', async () => {
+  const { app, worst, sources } = await run('fw241-display262');
+  assert.deepEqual([worst.decode, worst.framingErrors, worst.codecErrors], [0, 0, 0]);
+  assert.ok(app.store.snapshot(PROBE), 'probe seen');
+  assert.ok(sources.has('nodeConnection1'), `sources: ${[...sources]}`);
+  const sessions = await sessionsWithCounts(app);
+  assert.deepEqual(sessions.map((s) => s.id), [0x51efa763], 'one session, id from the relayed status');
+  assert.ok(sessions[0].stored > 0, 'history stored');
+});
+
+test('fw241-direct: probe fw v2.4.1 sends the 100 B status with its session', async () => {
+  const { app, worst, sources } = await run('fw241-direct');
+  assert.deepEqual([worst.decode, worst.framingErrors, worst.codecErrors], [0, 0, 0]);
+  assert.ok(sources.has('directConnection'), `sources: ${[...sources]}`);
+  assert.deepEqual((await sessionsWithCounts(app)).map((s) => s.id), [0x51efa763]);
+});

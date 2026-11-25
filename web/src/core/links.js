@@ -35,7 +35,7 @@ export async function readDeviceInfo(connection) {
 }
 
 /**
- * Fills in the session of statuses that carry none. The 94 B status of fw v2.3.3 and older has no session fields
+ * Fills in the session of statuses that carry none. The 94 B status of fw before v2.4.1 has no session fields
  * (spec/replays/charger-new-session), so on the first such status the link reads Session Info over UART and adds it to
  * every later status; history can then tell cooks apart. Statuses before the answer go out without it (the session
  * tracker adopts the id). A log range that goes backwards drops the cached info and reads it again. Firmware that

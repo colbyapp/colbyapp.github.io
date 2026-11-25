@@ -1,0 +1,19 @@
+{
+  "adapter": "CoreBluetooth",
+  "devices": [
+    {
+      "firmware": "v2.4.1",
+      "name": "probe 1000D027",
+      "peripheral": "221047F5-4C98-1B33-B878-73E8362C1696"
+    },
+    {
+      "firmware": "v2.6.2",
+      "name": "display T100000LG5",
+      "peripheral": "3917F8D0-0919-BBA1-F50E-87FED7D7733A"
+    }
+  ],
+  "formatVersion": 1,
+  "name": "fw241-display262",
+  "notes": "probe fw v2.4.1, Display fw v2.6.2; live check 2026-11-24",
+  "os": "macOS Version 26.3.1 (a) (Build 25D771280a)"
+}
