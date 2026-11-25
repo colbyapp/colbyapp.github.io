@@ -15,6 +15,7 @@ import { NotificationSink, SoundSink, ScreenWakeLock } from './platform.js';
 import { startHeartbeat, watchLifecycle, guardUnload, TitleFlasher } from './background.js';
 import { Onboarding, appStoreButton, bluetoothStatus, BROWSER_SUPPORT, CHOOSER_HINT, mobilePlatform, notifyTroubleshooting, unsupportedBrowser } from './onboarding.js';
 import { PumpedClock } from '../core/support.js';
+import { realSerialFor } from '../core/identity.js';
 import { isCooking } from '../core/alerts.js';
 
 const $ = (id) => document.getElementById(id);
@@ -109,6 +110,7 @@ app.history.on('samples', ({ serial }) => {
   if (serial === state.selected && !state.viewSession) reloadSamples();
 });
 app.history.on('sessions', () => {
+  resolveStandIns();
   if (!state.viewSession) reloadSamples();
 });
 
@@ -1045,7 +1047,10 @@ async function connectDevice() {
 /** Tells what a connected device is: probe serial or node serial and type. */
 async function identify(device, connection, isProbe) {
   const fromAd = ble.capabilities().watchAdvertisements ? await ble.identifyFromAdvertisement(device, 3000) : null;
-  if (isProbe) return { serial: fromAd?.kind === 'probe' ? fromAd.serial : ble.pseudoSerial(device.id) };
+  if (isProbe) {
+    if (fromAd?.kind === 'probe') return { serial: fromAd.serial };
+    return { serial: prefs.get('probeSerials', {})[device.id] ?? ble.pseudoSerial(device.id) };
+  }
   let model = '';
   try {
     model = cString(Array.from(await connection.read(GATT.modelNumber)));
@@ -1059,12 +1064,45 @@ async function identify(device, connection, isProbe) {
   return { serial: fromAd?.kind === 'node' ? fromAd.serial : ble.advertisedName(device) || ble.pseudoSerial(device.id), productType };
 }
 
-/** Browser Bluetooth devices by id, so their GATT links can be released (page hide, chooser, wake). */
+/**
+ * Browser Bluetooth devices by id, so their GATT links can be released (page hide, chooser, wake) and so a direct
+ * probe can be connected again under its real serial.
+ */
 const bleDevices = new Map();
 
 /** Releases Chrome's link to every device Colby has no live link to; a stale one can hide it from the chooser (I-1). */
 function releaseStaleLinks() {
   for (const [id, device] of bleDevices) if (!app.devices.get(id)?.link) ble.releaseDevice(device);
+}
+
+/**
+ * A direct probe without the advertisement flag gets a stand-in serial, so the same probe also seen through a Display
+ * showed up twice (e.g. 773DF86D and 1000D027). When the two report the same session ID, remember the real serial for
+ * this browser device, move the nickname over, and connect again under the real serial (core/identity.js).
+ */
+function resolveStandIns() {
+  const sessionIdOf = (serial) => app.history.currentSession(serial)?.sessionId ?? 0;
+  const direct = [...app.devices.values()]
+    .filter((d) => d.kind === 'probe' && !d.simulated && d.link && bleDevices.has(d.id) && d.serial === ble.pseudoSerial(d.id));
+  const standIns = new Set(direct.map((d) => d.serial));
+  const candidates = [...app.store.snapshots().keys()].filter((s) => !standIns.has(s));
+  for (const d of direct) {
+    const standIn = d.serial;
+    const real = realSerialFor(standIn, candidates, sessionIdOf);
+    if (!real) continue;
+    prefs.set('probeSerials', { ...prefs.get('probeSerials', {}), [d.id]: real });
+    if (state.names[standIn]) {
+      state.names[real] ??= state.names[standIn];
+      delete state.names[standIn];
+      prefs.set('names', state.names);
+    }
+    if (state.selected === standIn) state.selected = real;
+    const device = bleDevices.get(d.id);
+    app.removeDevice(d.id);
+    app.store.forget(standIn);
+    addBleDevice(device);
+    toast(`Matched the direct probe to ${probeName(real)} (${real}).`);
+  }
 }
 
 function addBleDevice(device) {

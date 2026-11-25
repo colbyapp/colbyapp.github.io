@@ -391,3 +391,16 @@ test('pumped clock fires timers from pump() when native timers are throttled', a
   assert.deepEqual(fired, ['tick', 'once', 'tick', 'tick']);
   assert.equal(clock.pending, 0);
 });
+
+test('a stand-in probe serial resolves to the one probe with the same session ID', async () => {
+  const { realSerialFor } = await import('../src/core/identity.js');
+  const sid = { '773DF86D': 0xABCD1234, '1000D027': 0xABCD1234, '10005A3F': 0x11112222 };
+  const of = (s) => sid[s] ?? 0;
+  assert.equal(realSerialFor('773DF86D', ['1000D027', '10005A3F'], of), '1000D027');
+  assert.equal(realSerialFor('773DF86D', ['10005A3F'], of), null, 'no match');
+  assert.equal(realSerialFor('773DF86D', ['773DF86D'], of), null, 'never itself');
+  assert.equal(realSerialFor('NEW', ['1000D027'], of), null, 'no session ID yet');
+  sid.AAAA0001 = 0xABCD1234;
+  assert.equal(realSerialFor('773DF86D', ['1000D027', 'AAAA0001'], of), null, 'ambiguous');
+  assert.equal(realSerialFor('X', ['Y'], () => 0), null, 'zero is not a session ID');
+});
