@@ -10,6 +10,7 @@ import { SimProbe, SimNodeConnection, cookCurve } from '../transport/simulated.j
 import { ALARM_CHANNELS, MAX_PREDICTION_SETPOINT, SENSORS, cString } from '../codec/index.js';
 import { Graph, seriesId } from './graph.js';
 import * as fmt from './format.js';
+import { kitchenGrid } from './kitchenLayout.js';
 import { NotificationSink, SoundSink, ScreenWakeLock } from './platform.js';
 import { startHeartbeat, watchLifecycle, guardUnload, TitleFlasher } from './background.js';
 import { Onboarding, appStoreButton, bluetoothStatus, BROWSER_SUPPORT, CHOOSER_HINT, mobilePlatform, notifyTroubleshooting, unsupportedBrowser } from './onboarding.js';
@@ -508,9 +509,25 @@ function renderKitchen(probes) {
       <div class="sub"><span style="color:var(--core)">${fmt.temp(p.virtual.core, state.unit, { degree: true })}</span>${target}${view?.readyAt && view.state === 'predicting' ? ` · ${fmt.clock(view.readyAt)}` : ''}</div>
     </div>`;
   }).join('');
-  k.innerHTML = `<div class="bar"><div class="brand">Colby · Kitchen</div><button class="btn" data-action="kitchen-exit">Exit</button></div>
+  // Clock and cook time sit quietly in the top corner; the cook runs from the earliest live session's start.
+  const starts = probes.map((p) => app.history.currentSession(p.serial)?.startedAt).filter((t) => t != null);
+  const now = Date.now();
+  const meta = `<div class="meta"><span>${fmt.clock(now)}</span>${starts.length ? `<span>Cook ${fmt.duration(now - Math.min(...starts))}</span>` : ''}</div>`;
+  k.innerHTML = `<div class="bar"><div class="brand">Colby · Kitchen</div><div class="end">${meta}<button class="btn" data-action="kitchen-exit">Exit</button></div></div>
     <div class="tiles">${tiles || '<div class="tile"><div class="sub">No probes</div></div>'}</div>
     ${alerting.size ? '<p class="caption" style="text-align:center">Tap anywhere or press any key to acknowledge</p>' : ''}`;
+  layoutKitchen();
+}
+
+/** Sizes the kitchen grid for the tile count and the space the tiles get (see kitchenLayout.js). */
+function layoutKitchen() {
+  const area = $('kitchen').querySelector('.tiles');
+  if (!area) return;
+  const { cols, rows, tileHeight } = kitchenGrid(area.children.length, area.clientWidth, area.clientHeight);
+  area.style.setProperty('--cols', cols);
+  area.style.setProperty('--rows', rows);
+  if (tileHeight) area.style.setProperty('--tile-h', `${tileHeight}px`);
+  else area.style.removeProperty('--tile-h');
 }
 
 // MARK: Dialogs
@@ -955,8 +972,17 @@ async function toggleScan() {
   }
 }
 
-/** Demo: a Display relaying two simulated probes, one mid-cook and one about to be ready. */
-function startDemo() {
+/** Demo: a Display relaying simulated probes, one mid-cook and one about to be ready. `#demo=N` (1-8) sets the count. */
+const DEMO_EXTRA = [
+  ['3000C0DE', 'Chicken thighs', { tauHours: 1, asymptote: 85, oven: 190 }, 79.5, 0.6],
+  ['4000FACE', 'Pork shoulder', { tauHours: 4 }, 93, 0.5],
+  ['5000D00D', 'Salmon', { tauHours: 0.6, asymptote: 60, oven: 135 }, 52, 0.7],
+  ['6000CAFE', 'Lamb rack', { tauHours: 1.2, asymptote: 70, oven: 180 }, 57, 0.4],
+  ['7000BABE', 'Turkey breast', { tauHours: 2, asymptote: 80, oven: 165 }, 71, 0.55],
+  ['8000F00D', 'Wings', { tauHours: 0.8, asymptote: 90, oven: 200 }, 82, 0.3],
+];
+
+function startDemo(count = 2) {
   if (app.devices.has('demo-display')) return;
   const now = Date.now();
   const brisket = new SimProbe({
@@ -968,10 +994,22 @@ function startDemo() {
     serial: '2000BEEF', probeNumber: 2, color: 'grey', sessionId: 0x55aa1234,
     startedAt: now - (ribsCurve.timeTo(90.5) * 1000 - 6 * 60_000), setpoint: 90.5, mode: 'timeToRemoval', curve: ribsCurve,
   });
-  for (const [serial, name] of [[brisket.serial, 'Brisket'], [ribs.serial, 'Ribs']]) state.names[serial] ??= name;
+  const probes = [brisket, ribs];
+  const names = [[brisket.serial, 'Brisket'], [ribs.serial, 'Ribs']];
+  DEMO_EXTRA.forEach(([serial, name, curveOpts, setpoint, progress], i) => {
+    const curve = cookCurve(curveOpts);
+    probes.push(new SimProbe({
+      serial, probeNumber: i + 3, color: 'yellow', sessionId: 0x60000000 + i,
+      startedAt: now - curve.timeTo(setpoint) * 1000 * progress, setpoint, mode: 'timeToRemoval', curve,
+    }));
+    names.push([serial, name]);
+  });
+  const n = Math.min(8, Math.max(1, count | 0));
+  probes.length = n;
+  for (const [serial, name] of names.slice(0, n)) state.names[serial] ??= name;
   app.addDevice({
     id: 'demo-display', name: 'Demo Display', simulated: true,
-    open: async () => new SimNodeConnection({ serial: 'DEMODISPLY', probes: [brisket, ribs], hops: 1 }),
+    open: async () => new SimNodeConnection({ serial: 'DEMODISPLY', probes, hops: 1 }),
     identify: async () => ({ serial: 'DEMODISPLY', productType: 'display' }),
   });
   toast('Demo mode: simulated probes.');
@@ -989,6 +1027,8 @@ $('kitchen-button').addEventListener('click', () => {
   document.documentElement.requestFullscreen?.().catch(() => {});
   invalidate();
 });
+
+window.addEventListener('resize', () => { if (state.kitchen) layoutKitchen(); });
 
 function exitKitchen() {
   state.kitchen = false;
@@ -1110,7 +1150,8 @@ if (remembered.length) {
     if (remembered.some((d) => d.id === device.id)) addBleDevice(device);
   }
 }
-if (location.hash === '#demo') startDemo();
+const demoHash = /^#demo(?:=([1-8]))?$/.exec(location.hash);
+if (demoHash) startDemo(demoHash[1] ? +demoHash[1] : 2);
 render();
 
 // Setup on the first load, and again while Bluetooth cannot be used and nothing is set up (once per browser session).
@@ -1124,5 +1165,5 @@ try {
 const bt = await bluetoothStatus();
 const firstStep = (step) => (mobilePlatform() ? 'mobile' : step);
 if (location.hash === '#setup') onboarding.open('welcome');
-else if (!prefs.get('onboarded', false) && location.hash !== '#demo') onboarding.open(firstStep('welcome'));
+else if (!prefs.get('onboarded', false) && !demoHash) onboarding.open(firstStep('welcome'));
 else if (bt !== 'ready' && app.devices.size === 0 && !setupDismissed) onboarding.open(firstStep('bluetooth'));

@@ -14,7 +14,8 @@ The source runs as is (plain ES modules, no build). The deployed site is built f
 | Test | `npm test` (Node 20+, no install needed) |
 | Production build | `npm ci && npm run build` → `web/dist/` |
 | Preview the build | `npm run preview`, then open http://localhost:8080 |
-| Try without hardware | add `#demo` to the URL; `#setup` reopens the first-run setup |
+| Try without hardware | add `#demo` to the URL (`#demo=1` … `#demo=8` sets the probe count); `#setup` reopens the first-run setup |
+| Kitchen mode screenshots | `PLAYWRIGHT=/path/to/node_modules/playwright-core node tools/kitchen-shots.mjs` (uses installed Chrome; writes `../docs/screenshots/`) |
 
 Web Bluetooth needs a secure context: HTTPS, or `localhost`. Opening `index.html` from disk (`file://`) does not work.
 
@@ -80,7 +81,7 @@ Source: [WebBluetoothCG implementation status](https://github.com/WebBluetoothCG
 | System notifications | Yes, after permission | Through the service worker, with Acknowledge and Snooze buttons that act without switching tabs; raised when an alert fires while the tab is hidden or unfocused |
 | First-run setup | Yes | Bluetooth check, notification permission, background tips; shown again while Bluetooth is unusable and nothing is set up (`#setup` forces it) |
 | Keep the computer awake during a cook | Partly | Screen Wake Lock; the browser releases it when the tab is hidden |
-| Kitchen mode | Yes | Full screen |
+| Kitchen mode | Yes | Full screen; tiles and type scale to the probe count and screen shape; clock and cook time in the corner |
 | Time remaining in the tab title | Yes | The selected probe's countdown (else the soonest cook's), e.g. `2:13 · Colby` |
 | Reconnect after a dropped link | Yes | Backoff 1, 2, 4 … 30 s |
 | Reconnect after reloading the page | Flag only | `getDevices()` needs chrome://flags/#enable-experimental-web-platform-features; otherwise pick the devices again |
