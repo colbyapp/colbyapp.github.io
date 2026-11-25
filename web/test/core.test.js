@@ -285,6 +285,29 @@ test('a connect attempt that hangs after open gives up at the deadline and retri
   app.stop();
 });
 
+test('a device that is not a Combustion device is marked unsupported and not retried', async () => {
+  const clock = new FakeClock();
+  let opens = 0;
+  const app = new ColbyApp({ clock });
+  await app.start();
+  const headphones = {
+    id: 'hp', name: 'Headphones', mtu: 23,
+    discover: async () => new Set(['00002a19-0000-1000-8000-00805f9b34fb']),
+    close: async () => {},
+    onDisconnect: () => () => {},
+  };
+  const device = app.addDevice({ id: 'hp', name: 'Headphones', open: async () => { opens++; return headphones; } });
+  await settle();
+  assert.equal(device.state, 'unsupported');
+  assert.equal(device.error, 'not a Combustion device');
+  await clock.advance(60_000);
+  assert.equal(opens, 1, 'no retries');
+  app.reconnectAll();
+  await settle();
+  assert.equal(opens, 1, 'reconnectAll skips it');
+  app.stop();
+});
+
 test('retry gives up a hung attempt instead of waiting for it', async () => {
   const clock = new FakeClock();
   const probe = new SimProbe({ serial: '10005A3F', clock, startedAt: clock.now() - HOUR });

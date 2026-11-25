@@ -96,6 +96,7 @@ app.on('probes', (map) => {
 app.on('prediction', () => invalidate());
 app.on('devices', (devices) => {
   announceIdentified(devices);
+  dropUnsupported(devices);
   // Keep the Devices dialog's states current; it used to show "Connecting…" until reopened.
   if (dialog.open && state.dialog === 'devices') devicesDialog();
   renderReconnectBand();
@@ -349,6 +350,7 @@ function deviceStateText(d) {
   if (d.state === 'connected') return d.kind === 'node' ? `Connected · ${d.link?.snapshot.probes.length ?? 0} probes` : 'Connected';
   if (d.state === 'reconnecting') return `Reconnecting${d.nextRetryAt ? ` in ${Math.max(0, Math.round((d.nextRetryAt - Date.now()) / 1000))} s` : ''}${d.error ? ` (${d.error})` : ''}`;
   if (d.state === 'connecting') return d.tries > 1 ? `Connecting… (try ${d.tries})` : 'Connecting…';
+  if (d.state === 'unsupported') return 'Not a Combustion device';
   return 'Disconnected';
 }
 
@@ -804,6 +806,7 @@ function devicesDialog() {
       <button class="btn danger" data-do="remove" data-id="${esc(d.id)}">Remove</button></div>`).join('') || '<p class="note">No devices yet.</p>'}</div>
     <div class="row" style="justify-content:flex-start">
       <button class="btn primary" data-do="connect" ${caps.bluetooth ? '' : 'disabled'}>Connect a device</button>
+      <button class="btn" data-do="any" ${caps.bluetooth ? '' : 'disabled'}>Show all devices</button>
       ${caps.scan ? `<button class="btn" data-do="scan">${state.scanStop ? 'Stop scanning' : 'Scan nearby'}</button>` : ''}
       <button class="btn" data-do="demo">Add demo devices</button>
     </div>
@@ -818,9 +821,12 @@ function devicesDialog() {
       prefs.set('devices', prefs.get('devices', []).filter((d) => d.id !== b.dataset.id));
       devicesDialog();
     },
+    // When nothing was picked, connectDevice may have opened the "Device not listed?" dialog: keep it.
     connect: async () => {
-      await connectDevice();
-      devicesDialog();
+      if (await connectDevice()) devicesDialog();
+    },
+    any: async () => {
+      if (await connectDevice({ any: true })) devicesDialog();
     },
     scan: async () => {
       await toggleScan();
@@ -1002,6 +1008,17 @@ function deviceLabel(d) {
   return d.name && d.name !== 'Combustion device' ? d.name : 'Combustion device (identifying…)';
 }
 
+/** A device picked from the unfiltered chooser that is not a Combustion device: say so and forget it. */
+function dropUnsupported(devices) {
+  for (const d of devices) {
+    if (d.state !== 'unsupported') continue;
+    app.removeDevice(d.id);
+    bleDevices.delete(d.id);
+    prefs.set('devices', prefs.get('devices', []).filter((k) => k.id !== d.id));
+    toast('That device is not a Combustion thermometer, Display or Booster. Pick another one.', 6000);
+  }
+}
+
 /** Says once what each newly connected device is, and remembers that name for the "previously used" list. */
 const announced = new Set();
 function announceIdentified(devices) {
@@ -1017,12 +1034,43 @@ function announceIdentified(devices) {
   for (const id of announced) if (!app.devices.has(id)) announced.delete(id);
 }
 
+/**
+ * After the filtered chooser closed with nothing picked: what to try, and the unfiltered chooser (F-3). Its button is
+ * the user gesture the chooser needs.
+ */
+function chooserEmptyDialog() {
+  openDialog(`<h2>Device not listed?</h2>
+    <ol class="note steps">
+      <li>Take the probe out of its charger to wake it, and keep it near the computer.</li>
+      <li>Close other Colby tabs. In <code>chrome://bluetooth-internals</code>, click Forget on any Combustion device marked Connected.</li>
+      <li>Or show every nearby device. The probe usually shows as “Unknown or Unsupported Device”: pick the one with the strongest signal.</li>
+    </ol>
+    <div class="row">
+      <button class="btn" data-do="close">Cancel</button>
+      <button class="btn" data-do="again">Try again</button>
+      <button class="btn primary" data-do="any">Show all devices</button>
+    </div>`, {
+    close: closeDialog,
+    again: () => {
+      closeDialog();
+      connectDevice();
+    },
+    any: () => {
+      closeDialog();
+      connectDevice({ any: true });
+    },
+  });
+}
+
 /** Shown when the chooser closes with nothing picked (backlog F-2): the device may be asleep or held by Chrome. */
 const CHOOSER_EMPTY_HINT = 'Device not listed? Take the probe out of its charger to wake it. Still missing? Open '
   + 'chrome://bluetooth-internals, click Forget on the Combustion device, close other Colby tabs, and try again.';
 
-/** Opens the browser's chooser and adds the picked device. Resolves true when a device was added. */
-async function connectDevice() {
+/**
+ * Opens the browser's chooser and adds the picked device. Resolves true when a device was added. `any` opens the
+ * chooser without the Combustion filter (backlog F-3). Closing the filtered chooser with nothing picked offers it.
+ */
+async function connectDevice({ any = false } = {}) {
   if (!ble.capabilities().bluetooth) {
     onboarding.open('bluetooth');
     return false;
@@ -1030,14 +1078,18 @@ async function connectDevice() {
   releaseStaleLinks();
   let device;
   try {
-    device = await ble.requestDevice();
+    device = await (any ? ble.requestAnyDevice() : ble.requestDevice());
   } catch (e) {
     // NotFoundError: the chooser was cancelled. SecurityError / NotAllowedError: Bluetooth blocked for the site.
     if (e?.name === 'SecurityError' || e?.name === 'NotAllowedError') onboarding.open('bluetooth');
-    else if (e?.name === 'NotFoundError') toast(CHOOSER_EMPTY_HINT, 12000);
-    else toast(`Could not open the device chooser: ${e?.message ?? e}`);
+    else if (e?.name === 'NotFoundError') {
+      if (any) toast(CHOOSER_EMPTY_HINT, 12000);
+      else chooserEmptyDialog();
+    } else toast(`Could not open the device chooser: ${e?.message ?? e}`);
     return false;
   }
+  // Evidence for I-1: which chooser found the device.
+  console.info(`[Colby] picked ${ble.advertisedName(device) ?? 'unnamed device'} (${device.id}) from the ${any ? 'unfiltered' : 'filtered'} chooser`);
   addBleDevice(device);
   const known = prefs.get('devices', []).filter((d) => d.id !== device.id);
   prefs.set('devices', [...known, { id: device.id, name: ble.advertisedName(device) ?? 'Combustion device' }]);

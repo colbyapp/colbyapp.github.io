@@ -41,6 +41,20 @@ export function requestDevice() {
 }
 
 /**
+ * The chooser without a filter (backlog F-3): lists every nearby device, for when the filtered one shows nothing (a
+ * probe in range was seen in chrome://bluetooth-internals but not in the filtered chooser, I-1). The services and the
+ * Combustion manufacturer data stay accessible. The user may pick something that is not a Combustion device; the core
+ * finds out on connect. Must run in a user gesture.
+ */
+export function requestAnyDevice() {
+  return bt().requestDevice({
+    acceptAllDevices: true,
+    optionalServices: SERVICES,
+    optionalManufacturerData: [VENDOR_ID],
+  });
+}
+
+/**
  * The device's name as the browser knows it, or null when it has none worth showing. Without an advertised name,
  * Chrome falls back to the Bluetooth address (Windows, Linux) or an identifier, and its chooser lists
  * "Unknown or Unsupported Device (…)".

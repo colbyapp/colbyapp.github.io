@@ -22,6 +22,14 @@ const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
  */
 export const CONNECT_DEADLINE_MS = 30_000;
 
+/** The device has neither the Probe Status service nor the UART: not a Combustion device. */
+class NotCombustion extends Error {
+  constructor() {
+    super('not a Combustion device');
+    this.name = 'NotCombustion';
+  }
+}
+
 class ConnectTimeout extends Error {
   constructor() {
     super('timed out');
@@ -127,7 +135,7 @@ export class ColbyApp extends Emitter {
 
   /** Retries every device that has no link, e.g. after the computer wakes or the browser unfreezes the tab. */
   reconnectAll() {
-    for (const d of this.devices.values()) if (!d.link && d.state !== 'disconnected') this.retry(d.id);
+    for (const d of this.devices.values()) if (!d.link && d.state !== 'disconnected' && d.state !== 'unsupported') this.retry(d.id);
   }
 
   #emitDevices() { this.emit('devices', [...this.devices.values()]); }
@@ -167,6 +175,8 @@ export class ColbyApp extends Emitter {
       d.connection = connection;
       const chars = await step(connection.discover());
       const isProbe = chars.has(GATT.probeStatus);
+      // Picked from the unfiltered chooser, it may be any Bluetooth device. Retrying would never help.
+      if (!isProbe && !chars.has(GATT.uartRX)) throw new NotCombustion();
       const ident = (await step(Promise.resolve(d.identify?.(connection, isProbe)))) ?? {};
       if (stale()) return;
       d.kind = isProbe ? 'probe' : 'node';
@@ -208,6 +218,11 @@ export class ColbyApp extends Emitter {
       d.attemptStartedAt = null;
       d.connection = null;
       connection?.close?.().catch?.(() => {});
+      if (e instanceof NotCombustion) {
+        d.state = 'unsupported';
+        this.#emitDevices();
+        return;
+      }
       this.#scheduleRetry(d);
     } finally {
       this.clock.clearTimeout(deadline);

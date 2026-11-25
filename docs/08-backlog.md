@@ -53,5 +53,5 @@ a name-prefix filter cannot work, because the probe advertises no name.
 
 ### F-3. Web: fallback chooser filter
 
-- **Status:** open (from I-1, do only if cause 2 is confirmed; finding 2 points to it)
+- **Status:** doing (branch `worktree-web-i1-chooser`, not merged). Built: when the filtered chooser closes with nothing picked, a "Device not listed?" dialog gives the steps and a **Show all devices** button; the Devices dialog has the button too. A device that turns out not to be Combustion (neither Probe Status nor UART) is marked `unsupported`, never retried, and removed with a toast. The console logs which chooser found the device (`[Colby] picked … from the filtered|unfiltered chooser`). To confirm on hardware: does the probe show in the unfiltered chooser, and does it connect from there?
 - Offer a "Show all devices" chooser (`acceptAllDevices` with `optionalManufacturerData: [0x09C7]`) when the filtered one finds nothing, so a Chrome change to filter matching cannot hide every device. A name-prefix filter will not work: the probe advertises no name.
