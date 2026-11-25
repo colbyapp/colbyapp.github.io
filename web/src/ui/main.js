@@ -112,25 +112,23 @@ function sortedProbes() {
     .sort((a, b) => a.probeNumber - b.probeNumber || a.serial.localeCompare(b.serial));
 }
 
-/** Tab title: the selected probe's time to ready, else the soonest among other cooks, e.g. `2:13 · Colby`. */
+/**
+ * Tab title: the selected probe's progress and time to ready, e.g. `62% · 2:13 · Colby`. When the selected probe has
+ * nothing to show, the soonest other countdown, else a ready probe, else a warming one.
+ */
 function tabTitle() {
-  const remaining = (p) => {
-    const view = p.isOffline ? null : app.presenter.view(p.serial);
-    return view?.state === 'predicting' && !view.isStale ? view.secondsRemaining ?? null : null;
-  };
-  let seconds = null;
+  let status = null;
   try {
-    const probes = sortedProbes();
-    const selected = probes.find((p) => p.serial === state.selected);
-    seconds = selected ? remaining(selected) : null;
-    if (seconds == null) {
-      const all = probes.map(remaining).filter((s) => s != null);
-      if (all.length) seconds = Math.min(...all);
-    }
+    const views = sortedProbes().map((p) => ({ p, view: p.isOffline ? null : app.presenter.view(p.serial) }))
+      .map((x) => ({ ...x, text: fmt.titleStatus(x.view, state.primaryTime) }))
+      .filter((x) => x.text);
+    const rank = ({ view }) => view.state === 'predicting' ? view.secondsRemaining
+      : view.state === 'removalPredictionDone' ? 1e9 : 2e9;
+    status = (views.find((x) => x.p.serial === state.selected) ?? views.sort((a, b) => rank(a) - rank(b))[0])?.text ?? null;
   } catch {
     /* the heartbeat can tick before `app` exists (top-level await during startup) */
   }
-  return seconds == null ? 'Colby' : `${fmt.countdown(seconds)} · Colby`;
+  return status ? `${status} · Colby` : 'Colby';
 }
 
 function probeName(serial) {

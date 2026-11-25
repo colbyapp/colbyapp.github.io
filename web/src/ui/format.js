@@ -45,6 +45,23 @@ const STATE_TEXT = {
 
 export const predictionStateText = (state) => STATE_TEXT[state] ?? '—';
 
+/**
+ * Short cook status for the tab title, or null when there is nothing to show: `62% · 2:13` (or `62% · 6:42 PM` when
+ * the clock is the primary time), `Resting · 2:13`, `40% · Warming`, `Ready`. Stale views show nothing.
+ */
+export function titleStatus(view, primaryTime = 'countdown') {
+  if (!view || view.isStale) return null;
+  const pct = view.percentToRemoval == null ? null : `${Math.floor(view.percentToRemoval)}%`;
+  const withPct = (s) => (pct ? `${pct} · ${s}` : s);
+  if (view.state === 'removalPredictionDone') return 'Ready';
+  if (view.state === 'predicting' && view.secondsRemaining != null) {
+    const eta = primaryTime === 'clock' && view.readyAt != null ? clock(view.readyAt) : countdown(view.secondsRemaining);
+    return view.type === 'resting' ? `Resting · ${eta}` : withPct(eta);
+  }
+  if (view.state === 'warming' && view.mode !== 'none') return withPct('Warming');
+  return null;
+}
+
 const CHANNEL_NAMES = { core: 'Core', surface: 'Surface', ambient: 'Ambient' };
 export const channelName = (ch) => CHANNEL_NAMES[ch] ?? ch.toUpperCase();
 
