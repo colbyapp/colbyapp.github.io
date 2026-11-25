@@ -275,25 +275,52 @@ function renderReconnectBand() {
       <button data-band="retry">Retry now</button><button class="secondary" data-band="devices">Devices</button>`;
   }
   const now = clock.now();
-  const d = down.find((x) => x.attemptStartedAt != null) ?? down[0];
-  const verb = down.some((x) => x.kind) ? 'Reconnecting to' : 'Connecting to';
-  const who = down.length === 1 ? deviceLabel(d) : `${down.length} devices`;
-  const why = state.wake?.reason === 'wake' ? 'Computer woke up. ' : state.wake?.reason === 'resume' ? 'Colby was paused. ' : '';
   const secs = (ms) => Math.max(0, Math.round(ms / 1000));
-  const detail = d.attemptStartedAt != null
-    ? `Try ${d.tries} · waiting for the device ${secs(now - d.attemptStartedAt)} s`
-    : `Try ${d.tries} failed${d.error ? ` (${d.error})` : ''} · next try in ${secs((d.nextRetryAt ?? now) - now)} s`;
-  const longest = Math.max(...down.map((x) => now - (x.downSince ?? now)));
-  band.querySelector('.title').textContent = `${why}${verb} ${who.replace(/ \(identifying…\)$/, '')}…`;
-  band.querySelector('.detail').textContent = detail;
+  const lost = down.filter(lostByBrowser);
+  const action = band.querySelector('[data-band="retry"], [data-band="pick"]');
   const hint = band.querySelector('.hint');
-  hint.hidden = longest < STILL_TRYING_MS;
-  hint.textContent = `Not back after ${fmt.duration(longest)}. Make sure the device is awake and in range. If Chrome is holding an old link, `
-    + 'open chrome://bluetooth-internals, click Forget on the device, then use Devices ▸ Connect a device.';
+  if (lost.length) {
+    // Retrying cannot help: Chrome forgot the device (its device list is emptied when the computer sleeps) and only a
+    // scan, which a page can start only through the chooser, brings it back.
+    const names = lost.map((x) => deviceLabel(x).replace(/ \(identifying…\)$/, ''));
+    band.querySelector('.title').textContent = `Chrome lost track of ${names.join(' and ')}`;
+    band.querySelector('.detail').textContent = lost.length > 1
+      ? 'Pick them again to reconnect, one at a time. They can take a few seconds to show in the list. Your cook and its history are kept.'
+      : 'Pick it again to reconnect. It can take a few seconds to show in the list. Your cook and its history are kept.';
+    action.dataset.band = 'pick';
+    action.textContent = 'Pick again';
+    hint.hidden = true;
+  } else {
+    const d = down.find((x) => x.attemptStartedAt != null) ?? down[0];
+    const verb = down.some((x) => x.kind) ? 'Reconnecting to' : 'Connecting to';
+    const who = down.length === 1 ? deviceLabel(d) : `${down.length} devices`;
+    const why = state.wake?.reason === 'wake' ? 'Computer woke up. ' : state.wake?.reason === 'resume' ? 'Colby was paused. ' : '';
+    band.querySelector('.title').textContent = `${why}${verb} ${who.replace(/ \(identifying…\)$/, '')}…`;
+    band.querySelector('.detail').textContent = d.attemptStartedAt != null
+      ? `Trying now · ${secs(now - d.attemptStartedAt)} s`
+      : `Couldn't connect${d.error ? ` (${d.error})` : ''} · next try in ${secs((d.nextRetryAt ?? now) - now)} s`;
+    action.dataset.band = 'retry';
+    action.textContent = 'Retry now';
+    const longest = Math.max(...down.map((x) => now - (x.downSince ?? now)));
+    hint.hidden = longest < STILL_TRYING_MS;
+    hint.textContent = `Not back after ${fmt.duration(longest)}. Make sure the device is awake and in range. If Chrome is holding an old link, `
+      + 'open chrome://bluetooth-internals, click Forget on the device, then use Devices ▸ Connect a device.';
+  }
   setBandShown(band, true);
 }
 
 const popovers = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype;
+
+/** How long after a wake a device may stay down before the band offers to pick it again. */
+const PICK_AFTER_WAKE_MS = 30_000;
+
+/**
+ * The browser has likely lost the device, so only picking it again in the chooser (a scan) can bring it back. Seen
+ * after the Mac slept, two ways: every GATT connect fails with "Bluetooth Device is no longer in range.", or every one
+ * hangs until "connect timed out". So: that error, or still down 30 s after a wake whatever the error.
+ */
+const lostByBrowser = (d) => d.state === 'reconnecting'
+  && (/no longer in range/i.test(d.error ?? '') || (state.wake != null && Date.now() - state.wake.at >= PICK_AFTER_WAKE_MS));
 
 function setBandShown(band, shown) {
   band.hidden = !shown;
@@ -309,7 +336,8 @@ $('reconnect-band').addEventListener('click', (e) => {
   if (b.dataset.band === 'retry') {
     releaseStaleLinks({ evenConnecting: true });
     app.reconnectAll();
-  } else devicesDialog();
+  } else if (b.dataset.band === 'pick') connectDevice();
+  else devicesDialog();
 });
 
 function renderEmpty() {
@@ -352,8 +380,10 @@ function renderEmpty() {
 
 function deviceStateText(d) {
   if (d.state === 'connected') return d.kind === 'node' ? `Connected · ${d.link?.snapshot.probes.length ?? 0} probes` : 'Connected';
-  if (d.state === 'reconnecting') return `Reconnecting${d.nextRetryAt ? ` in ${Math.max(0, Math.round((d.nextRetryAt - Date.now()) / 1000))} s` : ''}${d.error ? ` (${d.error})` : ''}`;
-  if (d.state === 'connecting') return d.tries > 1 ? `Connecting… (try ${d.tries})` : 'Connecting…';
+  if (d.state === 'reconnecting' && lostByBrowser(d)) return 'Lost by Chrome · use Connect a device to pick it again';
+  // No countdown: this text is redrawn only when devices change, so a countdown would freeze (it showed "in 0 s").
+  if (d.state === 'reconnecting') return `Reconnecting…${d.error ? ` (${d.error})` : ''}`;
+  if (d.state === 'connecting') return 'Connecting…';
   return 'Disconnected';
 }
 

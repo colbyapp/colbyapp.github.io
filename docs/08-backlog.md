@@ -42,6 +42,22 @@ Status: `open` (not started), `blocked` (needs info), `doing`, `done`.
    Display already connected (`00:57:36:27:81:11 – Paired`), not the probe. So the probe was in range and seen by Chrome,
    but did not match the chooser filter: cause 2 is back on the table. (bluetooth-internals may show services from an
    earlier GATT discovery, not from the advertisement.)
+3. Later the same day (branch `worktree-web-i1-chooser`, stale links released before the chooser) the **filtered**
+   chooser listed the probe: `[Colby] picked unnamed device (XcItg8E322jXRfMy7/SfgQ==) from the filtered chooser`. So
+   the filter matches the probe, and cause 2 is unlikely. Findings 1 and 2 were most likely the probe not advertising
+   (asleep, or not yet back after the Mac slept) or a link held from before; which one is not known.
+4. Sleep test (Display and probe connected, Mac asleep, then woken): both devices kept failing with
+   `Bluetooth Device is no longer in range.` for 17 min (38 tries). That is Chrome's GATT connect error for a device no
+   longer in its device list; the list is emptied when the adapter resets on sleep and refilled only by a scan, which a
+   page can start only through the chooser (without the experimental flag). So retrying alone cannot recover.
+   **Fix:** when a device fails with that error, the reconnect band says "Chrome lost track of …" with **Pick again**
+   (opens the chooser). Picking a device Colby already has reuses its record with the new handle and connects at once,
+   keeping the cook and history. Backoff is now ×1.5 from 1 s, at most 30 s; the band shows no try count.
+   **To confirm:** sleep test again, then Pick again for each device.
+5. Second sleep test: this time every GATT connect hung until `connect timed out` (15 s), for 17 min, on both devices.
+   Picking the devices again in the chooser brought them back; they took a while to show in the list. So after a wake
+   the band offers Pick again for any device still down after 30 s, whatever the error, and says the device can take a
+   few seconds to show.
 
 **Next:** with the probe showing in bluetooth-internals, open an `acceptAllDevices` chooser from the DevTools console. If
 it lists the probe, do F-3 as a "Show all devices" chooser (`acceptAllDevices` plus `optionalManufacturerData: [0x09C7]`);
@@ -53,5 +69,5 @@ a name-prefix filter cannot work, because the probe advertises no name.
 
 ### F-3. Web: fallback chooser filter
 
-- **Status:** open (from I-1, do only if cause 2 is confirmed; finding 2 points to it)
+- **Status:** skipped (2026-11-25). Finding 3 showed the filtered chooser lists the probe; built on a branch and dropped.
 - Offer a "Show all devices" chooser (`acceptAllDevices` with `optionalManufacturerData: [0x09C7]`) when the filtered one finds nothing, so a Chrome change to filter matching cannot hide every device. A name-prefix filter will not work: the probe advertises no name.
