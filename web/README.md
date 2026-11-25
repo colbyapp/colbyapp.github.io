@@ -118,7 +118,7 @@ Source: [WebBluetoothCG implementation status](https://github.com/WebBluetoothCG
 | First-run setup | Yes | Bluetooth check, notification permission, background tips; shown again while Bluetooth is unusable and nothing is set up (`#setup` forces it) |
 | Keep the computer awake during a cook | Partly | Screen Wake Lock; the browser releases it when the tab is hidden |
 | Kitchen mode | Yes | Full screen; tiles and type scale to the probe count and screen shape; clock and cook time in the corner |
-| Time remaining in the tab title | Yes | The selected probe's countdown (else the soonest cook's), e.g. `2:13 · Colby` |
+| Progress and time remaining in the tab title | Yes | The selected probe's progress and countdown (else the soonest cook's), e.g. `62% · 2:13 · Colby`; the ready time instead when the clock is the primary time; `Warming`, `Ready` |
 | Reconnect after a dropped link | Yes | Backoff 1, 2, 4 … 30 s |
 | Reconnect after reloading the page | Flag only | `getDevices()` needs chrome://flags/#enable-experimental-web-platform-features; otherwise pick the devices again |
 | Passive advertisement scanning (no connection) | Flag only | `requestLEScan()`, same flag |
