@@ -1,10 +1,14 @@
 name: web
 
-# Tests and builds web/ on every change; deploys web/dist to GitHub Pages from main (or by hand).
-# One-time setup: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Tests and builds web/ on every change. Deploys web/dist to GitHub Pages only from a `web-vX.Y.Z` tag, or from
+# "Run workflow" (any branch or tag). Merging to main does not deploy. Release steps: web/README.md → "Ship a release".
+# One-time setup: Settings → Pages → Build and deployment → Source: "GitHub Actions", and allow `web-v*` tags under
+# Settings → Environments → github-pages.
 
 on:
   push:
+    branches: ["**"]
+    tags: ["web-v*"] # GitHub skips the paths filter for tag pushes, so a tag always runs
     paths: ["web/**", "spec/**", ".github/workflows/web.yml"]
   pull_request:
     paths: ["web/**", "spec/**", ".github/workflows/web.yml"]
@@ -39,7 +43,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/web-v'))
     runs-on: ubuntu-24.04
     permissions:
       pages: write
