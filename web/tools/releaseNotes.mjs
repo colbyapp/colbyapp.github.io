@@ -1,10 +1,12 @@
-// Turns GitHub's generated release notes (the body `gh release create --generate-notes` writes) into the short list
-// Settings shows. Used by build.mjs on a `web-vX.Y.Z` tag.
-
 const ITEM = /^\* (.+?) by @\S+ in (https:\/\/\S+\/pull\/\d+)\s*$/;
+/** A hand-written bullet ("- text" or "* text"), for release notes written on the release page instead of generated. */
+const PLAIN = /^[-*] (.+?)\s*$/;
 const OTHER_APP = /^(mac|macos|windows|ci)\s*:/i; // PRs for the desktop apps or CI only; this list is the web app's
 
-/** `[{title, url}]` from the "What's Changed" list; desktop-only and CI-only PRs are left out, a `Web:` prefix dropped. */
+/**
+ * `[{title, url}]` from the "What's Changed" list; desktop-only and CI-only items are left out, a `Web:` prefix dropped.
+ * Takes GitHub's generated items (`* title by @user in <PR url>`) and hand-written bullets (url null).
+ */
 export function parseReleaseNotes(body) {
   const items = [];
   let inChanges = false;
@@ -12,9 +14,10 @@ export function parseReleaseNotes(body) {
     if (line.startsWith('## ')) inChanges = /what's changed/i.test(line);
     if (!inChanges) continue;
     const m = ITEM.exec(line);
-    if (!m || OTHER_APP.test(m[1])) continue;
-    const title = m[1].replace(/^web\s*:\s*/i, '');
-    items.push({ title: title.charAt(0).toUpperCase() + title.slice(1), url: m[2] });
+    const text = m ? m[1] : PLAIN.exec(line)?.[1];
+    if (!text || OTHER_APP.test(text)) continue;
+    const title = text.replace(/^web\s*:\s*/i, '');
+    items.push({ title: title.charAt(0).toUpperCase() + title.slice(1), url: m ? m[2] : null });
   }
   return items;
 }

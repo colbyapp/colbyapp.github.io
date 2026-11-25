@@ -22,9 +22,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # On a release tag: GitHub's generated release notes (the same text `gh release create --generate-notes` writes), for
-  # Settings → "What's new". A separate job because the notes API needs contents: write (it writes nothing); the build job
-  # runs npm and keeps a read-only token.
+  # On a release tag: the notes for Settings → "What's new". The release page's text when it has some (notes written by
+  # hand with `gh release create --notes-file`), else GitHub's generated notes (the same text `--generate-notes` writes).
+  # A separate job because the notes API needs contents: write (it writes nothing); the build job runs npm and keeps a
+  # read-only token.
   notes:
     if: startsWith(github.ref, 'refs/tags/web-v')
     runs-on: ubuntu-24.04
@@ -43,8 +44,14 @@ jobs:
           prev=$(git describe --tags --match 'web-v*' --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           args=(-f tag_name="$GITHUB_REF_NAME")
           [ -n "$prev" ] && args+=(-f previous_tag_name="$prev")
-          echo "notes for $GITHUB_REF_NAME since ${prev:-the first commit}"
-          body=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body)
+          # A tag pushed without a release page has none (404): fall back to generated notes.
+          if ! body=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq '.body // ""' 2>/dev/null); then body=""; fi
+          if [ -n "$body" ]; then
+            echo "notes for $GITHUB_REF_NAME from its release page"
+          else
+            echo "notes for $GITHUB_REF_NAME generated since ${prev:-the first commit}"
+            body=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body)
+          fi
           echo "$body"
           echo "body=$(printf '%s' "$body" | base64 -w0)" >> "$GITHUB_OUTPUT"
 

@@ -40,6 +40,7 @@ Releases are git tags named `web-vX.Y.Z`. (Plain `vX.Y.Z` tags are for the deskt
 |---|---|
 | See what is unreleased | `git fetch --tags && git log --oneline $(git describe --tags --match 'web-v*' --abbrev=0 origin/main)..origin/main -- web` |
 | Ship `main` | `gh release create web-v1.2.0 --target main --generate-notes` (creates the tag and a release page listing the merged PRs) |
+| Ship with hand-written notes | `gh release create web-v1.2.0 --target main --notes-file notes.md`. The file needs a `## What's Changed` heading with `- ` bullets; Settings → "What's new" then shows those bullets instead of the PR titles |
 | Ship without a release page | `git tag web-v1.2.0 origin/main && git push origin web-v1.2.0` (the app still shows the notes, but "See all changes" will not list this version) |
 | Watch the deploy | `gh run watch $(gh run list --workflow web.yml --event push --limit 1 --json databaseId --jq '.[0].databaseId')` |
 | Roll back | `gh workflow run web.yml --ref web-v1.1.0` (redeploys the older tag) |
