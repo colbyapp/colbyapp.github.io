@@ -12,8 +12,13 @@ cp "$RUNTIME" "$WORK"/support.js
 mk() { sed -e "s|<dc-import name=\"Main\" probes=\"8\" hint-size=\"100%,900px\">|<dc-import $2 hint-size=\"1440px,900px\">|" "$WORK"/Main8.dc.html > "$WORK"/$1.dc.html; }
 mk Main1At 'name="Main" probes="1" time-format="Ready at"'
 mk Kitchen1At 'name="Kitchen" probes="1" time-format="Ready at"'
+mk Kitchen2 'name="Kitchen" probes="2"'
+mk Kitchen3 'name="Kitchen" probes="3"'
+mk Kitchen8 'name="Kitchen" probes="8"'
 mk SettingsAlerts 'name="Settings" section="Alerts and sounds"'
 mk SettingsDevices 'name="Settings" section="Devices"'
-mkdir -p "$OUT"; rm -f -- "$OUT"/*.png
-node "$HERE"/shoot.mjs "$WORK" "$OUT" Main1:1440:900 Main1:1440:900:hover Main1At:1440:900 Main:1440:900 MainAlert:1440:900 Main8:1440:900 Kitchen1:1440:900 Kitchen1At:1440:900 Kitchen:1440:900 KitchenAlert:1440:900 LiveActivity:1440:1000 WindowsSurfaces:1440:1000 Sheets:1440:1140 Tokens:1440:1000 Onboarding:1440:1000 History:1440:900 History:1440:900:hover Settings:1440:900 SettingsAlerts:1440:900 SettingsDevices:1440:900 InstantRead:1440:900 KitchenInstant:1440:900 States:1440:1400
+# Keep earlier screenshots: move them to archive/<timestamp>/ instead of deleting them.
+mkdir -p "$OUT"
+if compgen -G "$OUT/*.png" > /dev/null; then A="$OUT/archive/$(date +%Y-%m-%d-%H%M%S)"; mkdir -p "$A"; mv -- "$OUT"/*.png "$A"/; fi
+node "$HERE"/shoot.mjs "$WORK" "$OUT" Main1:1440:900 Main1:1440:900:hover Main1At:1440:900 Main:1440:900 MainAlert:1440:900 Main8:1440:900 Kitchen1:1440:900 Kitchen1At:1440:900 Kitchen2:1440:900 Kitchen3:1440:900 Kitchen:1440:900 Kitchen8:1440:900 KitchenAlert:1440:900 LiveActivity:1440:1000 WindowsSurfaces:1440:1000 Sheets:1440:1140 Tokens:1440:1000 Onboarding:1440:1000 History:1440:900 History:1440:900:hover Settings:1440:900 SettingsAlerts:1440:900 SettingsDevices:1440:900 InstantRead:1440:900 KitchenInstant:1440:900 States:1440:1400
 rm -rf -- "$WORK"
