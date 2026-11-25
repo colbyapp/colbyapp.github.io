@@ -247,6 +247,66 @@ test('app with a node relaying two probes; reconnects after link loss', async ()
   app.stop();
 });
 
+test('a connect attempt that hangs after open gives up at the deadline and retries', async () => {
+  const { CONNECT_DEADLINE_MS } = await import('../src/core/app.js');
+  const clock = new FakeClock();
+  const probe = new SimProbe({ serial: '10005A3F', clock, startedAt: clock.now() - HOUR });
+  let opens = 0;
+  let closedHung = false;
+  const app = new ColbyApp({ clock });
+  await app.start();
+  const device = app.addDevice({
+    id: 'p', name: 'Probe',
+    open: async () => {
+      opens++;
+      const c = new SimProbeConnection(probe);
+      if (opens === 1) {
+        // Like Chrome after a wake: connected, but service discovery never answers.
+        c.discover = () => new Promise(() => {});
+        c.close = async () => { closedHung = true; };
+      }
+      return c;
+    },
+    identify: async () => ({ serial: probe.serial }),
+  });
+  await settle();
+  assert.equal(device.state, 'connecting');
+  assert.equal(device.tries, 1);
+  assert.ok(device.attemptStartedAt != null);
+  await clock.advance(CONNECT_DEADLINE_MS);
+  assert.equal(device.state, 'reconnecting');
+  assert.equal(device.error, 'timed out');
+  assert.ok(closedHung, 'the hung connection was closed');
+  assert.equal(device.attemptStartedAt, null);
+  await until(clock, () => device.state === 'connected');
+  assert.equal(opens, 2);
+  assert.equal(device.tries, 0);
+  assert.equal(device.downSince, null);
+  app.stop();
+});
+
+test('retry gives up a hung attempt instead of waiting for it', async () => {
+  const clock = new FakeClock();
+  const probe = new SimProbe({ serial: '10005A3F', clock, startedAt: clock.now() - HOUR });
+  let opens = 0;
+  const app = new ColbyApp({ clock });
+  await app.start();
+  const device = app.addDevice({
+    id: 'p', name: 'Probe',
+    open: () => (++opens === 1 ? new Promise(() => {}) : Promise.resolve(new SimProbeConnection(probe))),
+    identify: async () => ({ serial: probe.serial }),
+  });
+  await settle();
+  assert.equal(device.state, 'connecting');
+  app.retry('p');
+  await until(clock, () => device.state === 'connected');
+  assert.equal(opens, 2);
+  assert.equal(device.tries, 0);
+  app.reconnectAll(); // connected devices are left alone
+  assert.equal(opens, 2);
+  app.stop();
+});
+
 test('emitter once resolves null on timeout', async () => {
   const clock = new FakeClock();
   const e = new Emitter();

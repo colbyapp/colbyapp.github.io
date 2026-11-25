@@ -31,6 +31,7 @@ Status: `open` (not started), `blocked` (needs info), `doing`, `done`.
 **Done (2026-11-25):**
 - F-1: `pagehide` releases every device (`releaseDevice` in `web/src/transport/webBluetooth.js`). It fires only on close, reload or navigation, not on a tab switch, and the link ends with the page anyway, so it adds no connect cycles.
 - F-2: when the chooser closes with nothing picked, a toast says to wake the probe, then Forget the device in `chrome://bluetooth-internals`.
+- Reconnect after sleep: a heartbeat gap over 20 s counts as a wake; Colby releases stale links and reconnects at once. Each connect attempt has a 30 s deadline (only the GATT connect had one), and Retry gives up a hung attempt (it used to do nothing while "Connecting…"). A band over the top of the page shows which device, which try and the countdown, with Retry now; after 45 s it adds the `chrome://bluetooth-internals` hint.
 - Before opening the chooser and before each connect, Colby drops the GATT link Chrome still reports for any device it has no live link to. A connect that times out is cancelled the same way.
 
 **Findings (2026-11-25, 127.0.0.1 server, after the Mac slept):**

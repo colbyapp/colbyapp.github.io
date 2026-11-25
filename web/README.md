@@ -119,7 +119,7 @@ Source: [WebBluetoothCG implementation status](https://github.com/WebBluetoothCG
 | Keep the computer awake during a cook | Partly | Screen Wake Lock; the browser releases it when the tab is hidden |
 | Kitchen mode | Yes | Full screen; tiles and type scale to the probe count and screen shape; clock and cook time in the corner |
 | Progress and time remaining in the tab title | Yes | The selected probe's progress and countdown (else the soonest cook's), e.g. `62% · 2:13 · Colby`; the ready time instead when the clock is the primary time; `Warming`, `Ready` |
-| Reconnect after a dropped link | Yes | Backoff 1, 2, 4 … 30 s |
+| Reconnect after a dropped link | Yes | Backoff 1, 2, 4 … 30 s; 30 s limit per try; a band over the page shows progress |
 | Reconnect after reloading the page | Flag only | `getDevices()` needs chrome://flags/#enable-experimental-web-platform-features; otherwise pick the devices again |
 | Passive advertisement scanning (no connection) | Flag only | `requestLEScan()`, same flag |
 | Probe serial and signal strength on a direct connection | Flag only | `watchAdvertisements()`, same flag. Without it a direct probe gets a stand-in ID (see below) |
@@ -136,9 +136,9 @@ What keeps working with Colby in a background tab, and what stops it. Sources: [
 | Notifications not allowed | Sound and the in-tab band and title only; no pop-up, no Acknowledge/Snooze outside Colby. The setup and Settings say how to allow them |
 | Incognito / private window | Chrome blocks notifications there without asking; use a normal window |
 | Tab closed, browser closed | Stop. Colby asks before closing during a cook |
-| Computer asleep | Stop. The screen is kept awake only while the tab is visible |
+| Computer asleep | Stop. The screen is kept awake only while the tab is visible. On wake Colby drops stale links and reconnects at once |
 | Chrome Memory Saver unloads the tab | Stop. Add the site to "Always keep these sites active" or pin the tab. On return Colby says it was unloaded |
-| Tab frozen and resumed | Colby reconnects dropped links on resume |
+| Tab frozen and resumed | Colby drops stale links and reconnects on resume |
 | Android | Chrome pauses background tabs after a while; keep Colby on screen |
 
 Checked in Chromium with an emulated hidden tab: the demo's alert fired, the notification showed both buttons, Acknowledge

@@ -16,6 +16,18 @@ import { GATT } from '../transport/gatt.js';
 import { decodeAdvertisement } from '../codec/index.js';
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
+/**
+ * Most time one connect attempt (open, discover, identify, link start) may take. Only the GATT connect has a timeout of
+ * its own; after the computer wakes, Chrome can leave service discovery or the first UART reply pending for good.
+ */
+export const CONNECT_DEADLINE_MS = 30_000;
+
+class ConnectTimeout extends Error {
+  constructor() {
+    super('timed out');
+    this.name = 'ConnectTimeout';
+  }
+}
 
 export class ColbyApp extends Emitter {
   devices = new Map();
@@ -74,6 +86,13 @@ export class ColbyApp extends Emitter {
     const device = {
       id, name, open, identify, simulated, kind: null, serial: null, productType: null, link: null,
       state: 'connecting', error: null, attempt: 0, retryTimer: null, removed: false,
+      /** When the device last stopped being connected (or was added); null while connected. */
+      downSince: this.clock.now(),
+      /** When the attempt now running began; null between attempts. */
+      attemptStartedAt: null,
+      /** Connect attempts since the device was last connected. */
+      tries: 0,
+      token: 0,
     };
     this.devices.set(id, device);
     this.#connect(device);
@@ -92,33 +111,64 @@ export class ColbyApp extends Emitter {
     this.#emitDevices();
   }
 
-  /** Reconnects now instead of waiting for the backoff. */
+  /**
+   * Reconnects now instead of waiting for the backoff. An attempt that is still running is given up first: after the
+   * computer wakes, one can hang, and Retry must not wait for it.
+   */
   retry(id) {
     const d = this.devices.get(id);
-    if (!d || d.link || d.state === 'connecting') return;
+    if (!d || d.link) return;
     if (d.retryTimer != null) this.clock.clearTimeout(d.retryTimer);
     d.retryTimer = null;
+    if (d.attemptStartedAt != null) this.#abandonAttempt(d);
     d.attempt = 0;
     this.#connect(d);
   }
 
+  /** Retries every device that has no link, e.g. after the computer wakes or the browser unfreezes the tab. */
+  reconnectAll() {
+    for (const d of this.devices.values()) if (!d.link && d.state !== 'disconnected') this.retry(d.id);
+  }
+
   #emitDevices() { this.emit('devices', [...this.devices.values()]); }
 
+  /** Drops the attempt now running: later steps of it see a stale token and close what they opened. */
+  #abandonAttempt(d) {
+    d.token++;
+    d.attemptStartedAt = null;
+    const c = d.connection;
+    d.connection = null;
+    c?.close?.().catch?.(() => {});
+  }
+
   async #connect(d) {
+    const token = ++d.token;
     d.state = d.attempt ? 'reconnecting' : 'connecting';
     d.error = null;
+    d.tries++;
+    d.attemptStartedAt = this.clock.now();
+    d.downSince ??= d.attemptStartedAt;
     this.#emitDevices();
     let connection;
+    let deadline = null;
+    const timedOut = new Promise((_, reject) => {
+      deadline = this.clock.setTimeout(() => reject(new ConnectTimeout()), CONNECT_DEADLINE_MS);
+    });
+    timedOut.catch(() => {});
+    // Each step races the deadline. A step that loses keeps running; `stale()` makes its result be thrown away.
+    const step = (p) => Promise.race([p, timedOut]);
+    const stale = () => d.removed || d.token !== token;
     try {
-      connection = await d.open();
-      if (d.removed) {
+      connection = await step(d.open());
+      if (stale()) {
         await connection.close();
         return;
       }
       d.connection = connection;
-      const chars = await connection.discover();
+      const chars = await step(connection.discover());
       const isProbe = chars.has(GATT.probeStatus);
-      const ident = (await d.identify?.(connection, isProbe)) ?? {};
+      const ident = (await step(Promise.resolve(d.identify?.(connection, isProbe)))) ?? {};
+      if (stale()) return;
       d.kind = isProbe ? 'probe' : 'node';
       d.serial = ident.serial ?? d.serial ?? connection.id;
       d.productType = ident.productType ?? d.productType ?? (isProbe ? null : 'display');
@@ -129,20 +179,38 @@ export class ColbyApp extends Emitter {
       link.on('observation', (o) => this.store.ingest(o));
       link.on('node', (n) => this.store.ingestNode(n));
       link.on('disconnected', (reason) => this.#lost(d, link, reason));
-      await link.start();
-      if (d.removed) {
+      const started = link.start();
+      try {
+        await step(started);
+      } catch (e) {
+        if (e instanceof ConnectTimeout) started.then(() => link.close(), () => {});
+        throw e;
+      }
+      if (stale()) {
         await link.close();
         return;
       }
       d.link = link;
       d.state = 'connected';
       d.attempt = 0;
+      d.tries = 0;
+      d.downSince = null;
+      d.attemptStartedAt = null;
       this.#emitDevices();
       if (isProbe) this.history.resume(d.serial);
     } catch (e) {
+      if (stale()) {
+        connection?.close?.().catch?.(() => {});
+        return;
+      }
       d.error = e?.message ?? String(e);
+      console.warn(`[Colby] connect try ${d.tries} to ${d.name} (${d.id}) failed:`, e);
+      d.attemptStartedAt = null;
+      d.connection = null;
       connection?.close?.().catch?.(() => {});
       this.#scheduleRetry(d);
+    } finally {
+      this.clock.clearTimeout(deadline);
     }
   }
 
@@ -150,6 +218,7 @@ export class ColbyApp extends Emitter {
     if (d.link !== link) return;
     d.link = null;
     if (d.removed) return;
+    d.downSince = this.clock.now();
     if (reason === 'requested') {
       d.state = 'disconnected';
       this.#emitDevices();
