@@ -38,7 +38,7 @@ export class SimProbe {
     serial, probeNumber = 1, color = 'yellow', sessionId = 0x1a2b3c4d, samplePeriodMs = 5000, clock = systemClock,
     startedAt = clock.now(), curve = cookCurve(), setpoint = null, mode = 'none', legacy = false,
   }) {
-    // `legacy`: fw v2.3.3 and older, a 94 B status without session fields (Read Session Info still answers).
+    // `legacy`: fw before v2.4.1, a 94 B status without session fields (Read Session Info still answers).
     Object.assign(this, { serial, probeNumber, color, sessionId, samplePeriodMs, clock, startedAt, curve, legacy });
     this.requests = [];
     this.virtualSensors = { core: 't2', surface: 't5', ambient: 't8' };
@@ -153,7 +153,7 @@ export class SimProbe {
         }
         return [{ type: 'ack' }];
       }
-      case 'readProbeFirmware': return [{ type: 'revision', kind: 'firmware', text: 'v2.4.0' }];
+      case 'readProbeFirmware': return [{ type: 'revision', kind: 'firmware', text: 'v2.4.1' }];
       case 'readProbeHardware': return [{ type: 'revision', kind: 'hardware', text: 'v1.2' }];
       case 'readProbeModel': return [{ type: 'revision', kind: 'model', text: 'Predictive Probe' }];
       default:
@@ -224,7 +224,7 @@ export class SimProbeConnection extends SimConnection {
   constructor(probe) {
     super(`sim-probe-${probe.serial}`, `Probe ${probe.serial}`, probe.clock,
       [GATT.probeStatus, GATT.uartRX, GATT.uartTX, GATT.firmwareRevision, GATT.serialNumber, GATT.modelNumber],
-      { [GATT.firmwareRevision]: 'v2.4.0', [GATT.serialNumber]: probe.serial, [GATT.modelNumber]: 'Predictive Probe' });
+      { [GATT.firmwareRevision]: 'v2.4.1', [GATT.serialNumber]: probe.serial, [GATT.modelNumber]: 'Predictive Probe' });
     this.probe = probe;
     this.every(probe.samplePeriodMs, () => this.notify(GATT.probeStatus, encodeProbeStatus(probe.status(), probe.layout)));
   }
@@ -263,7 +263,7 @@ export class SimNodeConnection extends SimConnection {
   constructor({ serial = 'DISPLAY01', probes, clock = systemClock, hops = 1 }) {
     super(`sim-node-${serial}`, `Display ${serial}`, clock,
       [GATT.uartRX, GATT.uartTX, GATT.firmwareRevision, GATT.modelNumber, GATT.serialNumber],
-      { [GATT.firmwareRevision]: 'v3.1.0', [GATT.modelNumber]: 'Display', [GATT.serialNumber]: serial });
+      { [GATT.firmwareRevision]: 'v2.6.2', [GATT.modelNumber]: 'Display', [GATT.serialNumber]: serial });
     Object.assign(this, { serial, probes, hops });
     const period = probes[0]?.samplePeriodMs ?? 5000;
     this.every(period, () => {
