@@ -90,6 +90,8 @@ globalThis.colby = app; // for the console
 
 app.on('probes', (map) => {
   recordLive(map);
+  // Whichever arrives last (the direct link, its session, the node's report of the same probe), match then.
+  resolveStandIns();
   if (!state.selected || !map.has(state.selected)) state.selected = sortedProbes()[0]?.serial ?? null;
   invalidate();
 });
@@ -1094,7 +1096,9 @@ function resolveStandIns() {
     const real = realSerialFor(standIn, candidates, sessionIdOf);
     if (!real) {
       const hex = (s) => (sessionIdOf(s) >>> 0).toString(16).toUpperCase();
-      console.info(`[Colby] stand-in ${standIn} (session ${hex(standIn)}) not matched; others: ${candidates.map((s) => `${s}=${hex(s)}`).join(', ') || 'none'}`);
+      const miss = `[Colby] stand-in ${standIn} (session ${hex(standIn)}) not matched; others: ${candidates.map((s) => `${s}=${hex(s)}`).join(', ') || 'none'}`;
+      if (miss !== resolveStandIns.lastMiss) console.info(miss);
+      resolveStandIns.lastMiss = miss;
       continue;
     }
     prefs.set('probeSerials', { ...prefs.get('probeSerials', {}), [d.id]: real });
