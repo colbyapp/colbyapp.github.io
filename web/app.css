@@ -209,6 +209,7 @@ dialog .note a { color: var(--text2); }
 dialog .error { color: #ff9a9d; font-size: 14px; margin: 0; }
 dialog fieldset { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; display: grid; gap: 10px; }
 dialog legend { color: var(--text2); font-weight: 600; padding: 0 6px; }
+dialog .changes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; color: var(--text2); }
 dialog .alarm-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
 
 /* Kitchen mode */

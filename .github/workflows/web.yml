@@ -22,7 +22,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # On a release tag: GitHub's generated release notes (the same text `gh release create --generate-notes` writes), for
+  # Settings → "What's new". A separate job because the notes API needs contents: write (it writes nothing); the build job
+  # runs npm and keeps a read-only token.
+  notes:
+    if: startsWith(github.ref, 'refs/tags/web-v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      body: ${{ steps.notes.outputs.body }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev=$(git describe --tags --match 'web-v*' --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          args=(-f tag_name="$GITHUB_REF_NAME")
+          [ -n "$prev" ] && args+=(-f previous_tag_name="$prev")
+          echo "notes for $GITHUB_REF_NAME since ${prev:-the first commit}"
+          body=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body)
+          echo "$body"
+          echo "body=$(printf '%s' "$body" | base64 -w0)" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: notes
+    if: ${{ !cancelled() && needs.notes.result != 'failure' }}
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -37,13 +65,17 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          COLBY_RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/web-v') && github.ref_name || '' }}
+          COLBY_RELEASE_NOTES_B64: ${{ needs.notes.outputs.body }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: web/dist
 
   deploy:
     needs: build
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/web-v'))
+    # The explicit result check: the skipped notes job (non-tag runs) would otherwise skip this job too.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/web-v'))) }}
     runs-on: ubuntu-24.04
     permissions:
       pages: write

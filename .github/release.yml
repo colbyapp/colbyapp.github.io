@@ -1,0 +1,5 @@
+# Generated release notes (GitHub release pages and Settings → "What's new" in the web app).
+# Label a PR `skip-changelog` to leave it out, e.g. CI or docs-only changes users never see.
+changelog:
+  exclude:
+    labels: [skip-changelog]
