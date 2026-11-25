@@ -36,6 +36,10 @@ const state = {
   active: [],
   scanStop: null,
   kitchen: false,
+  /** Set when the computer woke or the tab unfroze, until every device is back: `{reason: 'wake'|'resume', at}`. */
+  wake: null,
+  /** Which dialog is open, for the ones that redraw when devices change. */
+  dialog: null,
 };
 
 /** Probes heard only by advertisement have no log; their graph is built from live values here. */
@@ -56,8 +60,20 @@ const notifications = new NotificationSink({
 // a background tab, where Chrome batches main-thread timers to once a minute (ui/background.js).
 const clock = new PumpedClock();
 const titleFlasher = new TitleFlasher();
+/** A heartbeat gap this long means the computer slept (or the tab was frozen); Bluetooth links did not survive it. */
+const WAKE_GAP_MS = 20_000;
+let lastBeat = Date.now();
 const heartbeat = startHeartbeat(() => {
+  const now = Date.now();
+  const gap = now - lastBeat;
+  lastBeat = now;
   clock.pump();
+  try {
+    if (gap > WAKE_GAP_MS) onWake('wake');
+    renderReconnectBand();
+  } catch {
+    /* the heartbeat can tick before `app` exists (top-level await during startup) */
+  }
   const a = state.active.find((x) => x.state === 'firing');
   titleFlasher.tick(a ? `${probeName(a.serial)}: ${fmt.describeAlert(a, state.unit).title}` : null, tabTitle());
 });
@@ -79,6 +95,9 @@ app.on('probes', (map) => {
 app.on('prediction', () => invalidate());
 app.on('devices', (devices) => {
   announceIdentified(devices);
+  // Keep the Devices dialog's states current; it used to show "Connecting…" until reopened.
+  if (dialog.open && state.dialog === 'devices') devicesDialog();
+  renderReconnectBand();
   invalidate();
 });
 app.on('nodes', () => invalidate());
@@ -226,6 +245,66 @@ function renderAlertBand() {
     ${a.state === 'firing' ? `<button class="secondary" data-snooze="${esc(a.id)}">Snooze 5 min</button>` : ''}`;
 }
 
+/** After this long without a connection, the band adds what to do if Chrome is holding the device (backlog I-1). */
+const STILL_TRYING_MS = 45_000;
+
+/**
+ * Band over the top of the page while a real device connects or reconnects, so a reconnect after sleep does not look
+ * stuck: which device, which try, how long this try has run or when the next starts, and Retry now. It is a manual
+ * popover so it also shows above an open dialog (raised again in openDialog). Updated every heartbeat; the parts are
+ * built once so the buttons keep focus and hover.
+ */
+function renderReconnectBand() {
+  const band = $('reconnect-band');
+  const down = [...app.devices.values()].filter((d) => !d.simulated && (d.state === 'connecting' || d.state === 'reconnecting'));
+  if (!down.length) {
+    state.wake = null;
+    setBandShown(band, false);
+    return;
+  }
+  if (!band.firstChild) {
+    band.innerHTML = `<span class="spinner" aria-hidden="true"></span>
+      <div class="grow"><div class="title"></div><div class="detail"></div><div class="hint"></div></div>
+      <button data-band="retry">Retry now</button><button class="secondary" data-band="devices">Devices</button>`;
+  }
+  const now = clock.now();
+  const d = down.find((x) => x.attemptStartedAt != null) ?? down[0];
+  const verb = down.some((x) => x.kind) ? 'Reconnecting to' : 'Connecting to';
+  const who = down.length === 1 ? deviceLabel(d) : `${down.length} devices`;
+  const why = state.wake?.reason === 'wake' ? 'Computer woke up. ' : state.wake?.reason === 'resume' ? 'Colby was paused. ' : '';
+  const secs = (ms) => Math.max(0, Math.round(ms / 1000));
+  const detail = d.attemptStartedAt != null
+    ? `Try ${d.tries} · waiting for the device ${secs(now - d.attemptStartedAt)} s`
+    : `Try ${d.tries} failed${d.error ? ` (${d.error})` : ''} · next try in ${secs((d.nextRetryAt ?? now) - now)} s`;
+  const longest = Math.max(...down.map((x) => now - (x.downSince ?? now)));
+  band.querySelector('.title').textContent = `${why}${verb} ${who.replace(/ \(identifying…\)$/, '')}…`;
+  band.querySelector('.detail').textContent = detail;
+  const hint = band.querySelector('.hint');
+  hint.hidden = longest < STILL_TRYING_MS;
+  hint.textContent = `Not back after ${fmt.duration(longest)}. Make sure the device is awake and in range. If Chrome is holding an old link, `
+    + 'open chrome://bluetooth-internals, click Forget on the device, then use Devices ▸ Connect a device.';
+  setBandShown(band, true);
+}
+
+const popovers = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype;
+
+function setBandShown(band, shown) {
+  band.hidden = !shown;
+  if (!popovers) return;
+  const open = band.matches(':popover-open');
+  if (shown && !open) band.showPopover();
+  else if (!shown && open) band.hidePopover();
+}
+
+$('reconnect-band').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-band]');
+  if (!b) return;
+  if (b.dataset.band === 'retry') {
+    releaseStaleLinks();
+    app.reconnectAll();
+  } else devicesDialog();
+});
+
 function renderEmpty() {
   const caps = ble.capabilities();
   const devices = [...app.devices.values()];
@@ -267,7 +346,7 @@ function renderEmpty() {
 function deviceStateText(d) {
   if (d.state === 'connected') return d.kind === 'node' ? `Connected · ${d.link?.snapshot.probes.length ?? 0} probes` : 'Connected';
   if (d.state === 'reconnecting') return `Reconnecting${d.nextRetryAt ? ` in ${Math.max(0, Math.round((d.nextRetryAt - Date.now()) / 1000))} s` : ''}${d.error ? ` (${d.error})` : ''}`;
-  if (d.state === 'connecting') return 'Connecting…';
+  if (d.state === 'connecting') return d.tries > 1 ? `Connecting… (try ${d.tries})` : 'Connecting…';
   return 'Disconnected';
 }
 
@@ -534,12 +613,22 @@ const dialog = $('dialog');
 const form = $('dialog-form');
 let dialogHandlers = {};
 
-function openDialog(html, handlers = {}) {
+function openDialog(html, handlers = {}, name = null) {
   form.innerHTML = html;
   dialogHandlers = handlers;
-  if (!dialog.open) dialog.showModal();
+  state.dialog = name;
+  if (!dialog.open) {
+    dialog.showModal();
+    // The modal joined the top layer above the reconnect band: put the band back on top so it stays visible.
+    const band = $('reconnect-band');
+    if (popovers && band.matches(':popover-open')) {
+      band.hidePopover();
+      band.showPopover();
+    }
+  }
   form.querySelector('[autofocus]')?.focus();
 }
+dialog.addEventListener('close', () => (state.dialog = null));
 
 form.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-do]');
@@ -743,7 +832,7 @@ function devicesDialog() {
       if (target.dataset.probe) app.setHidden(target.dataset.probe, !target.checked);
       invalidate();
     },
-  });
+  }, 'devices');
 }
 
 function historyDialog() {
@@ -970,7 +1059,7 @@ async function identify(device, connection, isProbe) {
   return { serial: fromAd?.kind === 'node' ? fromAd.serial : ble.advertisedName(device) || ble.pseudoSerial(device.id), productType };
 }
 
-/** Browser Bluetooth devices by id, so their GATT links can be released (page hide, chooser). */
+/** Browser Bluetooth devices by id, so their GATT links can be released (page hide, chooser, wake). */
 const bleDevices = new Map();
 
 /** Releases Chrome's link to every device Colby has no live link to; a stale one can hide it from the chooser (I-1). */
@@ -1149,18 +1238,29 @@ const lifecycle = watchLifecycle({
     render();
   },
   // Chrome froze the tab (no events meanwhile): reconnect what dropped.
-  onResume: () => {
-    for (const d of app.devices.values()) if (!d.link) app.retry(d.id);
-    toast('The browser paused Colby. Reconnecting…');
-  },
+  onResume: () => onWake('resume'),
 });
 guardUnload(cookAtRisk);
 // Closing, reloading or leaving the page releases every device, so Chrome does not hold a link that hides it from
-// the next chooser (backlog F-1). This fires only when the page goes away (not on a tab switch), and the link ends
-// with the page anyway, so it adds no connect cycles.
+// the next chooser (backlog F-1).
 addEventListener('pagehide', () => {
   for (const device of bleDevices.values()) ble.releaseDevice(device);
 });
+addEventListener('pageshow', (e) => {
+  if (e.persisted) onWake('resume');
+});
+
+/**
+ * After the computer wakes or the tab unfreezes: drop the links Chrome may still report from before, and reconnect now
+ * instead of waiting out the backoff. The reconnect band says so until every device is back.
+ */
+function onWake(reason) {
+  if (![...app.devices.values()].some((d) => !d.simulated)) return;
+  state.wake = { reason, at: Date.now() };
+  releaseStaleLinks();
+  app.reconnectAll();
+  renderReconnectBand();
+}
 
 // Acknowledge / Snooze pressed on a notification (service worker, sw.js).
 navigator.serviceWorker?.addEventListener('message', (e) => {
