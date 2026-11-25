@@ -589,7 +589,7 @@ function renderKitchen(probes) {
     const alert = state.active.find((a) => a.serial === p.serial && a.state === 'firing');
     return `<div class="tile${alerting.has(p.serial) ? ' alerting' : ''}">
       <div class="head">${badge(p)} ${esc(probeName(p.serial))}</div>
-      <div class="big">${esc(alert ? fmt.describeAlert(alert, state.unit).title : big)}</div>
+      <div class="big${alert ? ' text' : ''}">${esc(alert ? fmt.describeAlert(alert, state.unit).title : big)}</div>
       <div class="sub"><span style="color:var(--core)">${fmt.temp(p.virtual.core, state.unit, { degree: true })}</span>${target}${view?.readyAt && view.state === 'predicting' ? ` · ${fmt.clock(view.readyAt)}` : ''}</div>
     </div>`;
   }).join('');
