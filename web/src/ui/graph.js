@@ -1,10 +1,10 @@
-// Temperature graph on a canvas (docs/06 §4.1): core/surface/ambient or all 8 sensors, target line, gaps as breaks,
-// pointer and keyboard scrubbing. Single lines can be hidden (`hidden`: 'core', 'surface', 'ambient', 't0'…'t7'). Colors come from CSS custom properties so the page theme drives them.
+// Temperature graph on a canvas (docs/06 §4.1): all 8 sensors, target line, gaps as breaks,
+// pointer and keyboard scrubbing. Single lines can be hidden (`hidden`: 't0'…'t7'). Colors come from CSS custom properties so the page theme drives them.
 
 import { toUnit, clock } from './format.js';
 
-/** Hide key of a line: a role name, or 't0'…'t7' for a sensor in all-sensors mode. */
-export const seriesId = (key) => (typeof key === 'number' ? `t${key}` : key);
+/** Hide key of a sensor line: 't0'…'t7'. */
+export const seriesId = (i) => `t${i}`;
 
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -12,7 +12,7 @@ const css = (name) => getComputedStyle(document.documentElement).getPropertyValu
  * @typedef {{time: number, temps: number[], vs: number[]}} Sample   vs = sensor index of core, surface, ambient
  */
 export class Graph {
-  #data = { samples: [], target: null, from: 0, to: 1, unit: 'F', mode: 'csa', period: 5000, hidden: new Set() };
+  #data = { samples: [], target: null, from: 0, to: 1, unit: 'F', period: 5000, hidden: new Set() };
   #scrubTime = null;
   #layout = null;
 
@@ -50,11 +50,8 @@ export class Graph {
 
   /** The lines drawn for one sample, without hidden ones. */
   #series(sample) {
-    const { mode, hidden } = this.#data;
-    const all = mode === 'all'
-      ? sample.temps.map((t, i) => ({ i, t }))
-      : [{ i: 'core', t: sample.temps[sample.vs[0]] }, { i: 'surface', t: sample.temps[sample.vs[1]] }, { i: 'ambient', t: sample.temps[sample.vs[2]] }];
-    return all.filter((p) => !hidden.has(seriesId(p.i)));
+    const { hidden } = this.#data;
+    return sample.temps.map((t, i) => ({ i, t })).filter((p) => !hidden.has(seriesId(p.i)));
   }
 
   #yRange(visible) {
@@ -90,7 +87,7 @@ export class Graph {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
 
-    const { from, to, unit, target, mode, period } = this.#data;
+    const { from, to, unit, target, period } = this.#data;
     const visible = this.#visible();
     const y = this.#yRange(visible);
     const left = 52;
@@ -159,18 +156,18 @@ export class Graph {
     g.lineJoin = 'round';
     g.lineCap = 'round';
     const colors = { core: css('--core'), surface: css('--surface'), ambient: css('--ambient') };
-    const keys = (mode === 'all' ? [0, 1, 2, 3, 4, 5, 6, 7] : ['core', 'surface', 'ambient'])
+    const keys = [0, 1, 2, 3, 4, 5, 6, 7]
       .filter((k) => !this.#data.hidden.has(seriesId(k)));
     const roleOf = (s, i) => (i === s.vs[0] ? 'core' : i === s.vs[1] ? 'surface' : i === s.vs[2] ? 'ambient' : null);
-    // In "all" mode draw grey sensors first so the colored ones sit on top.
-    const order = mode === 'all' && visible.length
+    // Draw grey sensors first so the colored ones sit on top.
+    const order = visible.length
       ? [...keys].sort((a, b) => (roleOf(visible.at(-1), a) ? 1 : 0) - (roleOf(visible.at(-1), b) ? 1 : 0))
       : keys;
     for (const key of order) {
       const last = visible.at(-1);
-      const role = mode === 'all' ? (last ? roleOf(last, key) : null) : key;
+      const role = last ? roleOf(last, key) : null;
       g.strokeStyle = role ? colors[role] : css('--other');
-      g.lineWidth = mode === 'all' ? (role ? 2.5 : 1.5) : 3;
+      g.lineWidth = role ? 2.5 : 1.5;
       g.beginPath();
       let prev = null;
       for (const s of visible) {
@@ -200,17 +197,6 @@ export class Graph {
       g.moveTo(px, top);
       g.lineTo(px, top + ph);
       g.stroke();
-      for (const key of mode === 'all' ? [] : ['core', 'surface', 'ambient']) {
-        const v = toUnit(this.#series(scrub).find((p) => p.i === key)?.t, unit);
-        if (v == null) continue;
-        g.beginPath();
-        g.arc(px, yOf(v), 7, 0, Math.PI * 2);
-        g.fillStyle = colors[key];
-        g.fill();
-        g.lineWidth = 2.5;
-        g.strokeStyle = '#fff';
-        g.stroke();
-      }
     }
   }
 

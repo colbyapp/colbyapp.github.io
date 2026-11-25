@@ -53,7 +53,7 @@ Matches the official app's layout (§17.5). Board: `Main1` (1 probe), `Main`, `M
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Colby [Live|1h|4h|All] [C·S·A | All 8]                ⏰  Kitchen mode ⚙ │ toolbar
+│ Colby                                                 ⏰  Kitchen mode ⚙ │ toolbar
 ├───────────────────────────────────────────────────────┬──────────────────┤
 │ (1) Brisket                              Ready in      │ Cooking to 203°F │
 │ Predictive Cook · started 10:00          3:42 at 17:02 │ ████████░░  77%  │
@@ -72,18 +72,17 @@ Matches the official app's layout (§17.5). Board: `Main1` (1 probe), `Main`, `M
 - Header: badge + name, cook type + start; ready block right (primary format large, secondary muted).
 - Readout row: Core / Surface / Ambient pills over large condensed numbers. Show live values; while scrubbing, the values under the pointer.
 - Graph: the selected probe only. Probe chips (shown when > 1 probe) switch the selection.
-- Toolbar range: `Live` follows now with a 30 min window; `1h`, `4h`, `All`; drag/scroll to pan and zoom pauses Live until "Back to live".
 - `⏰n` = active alert count (hidden at 0).
 
 ### 4.1 Graph spec
 
 | Element | Rule |
 |---|---|
-| Series | Core `#4ea1f7`, Surface `#ffb81c`, Ambient `#f5701f`; 3 px solid. "All 8" mode: T1–T8 thin lines, core/surface/ambient sensors in their colors, others grey |
+| Series | Core `#4ea1f7`, Surface `#ffb81c`, Ambient `#f5701f`; T1–T8 lines: the core/surface/ambient sensors in their colors (2.5 px), others grey (1.5 px). The sensor tiles hide or show single lines. The Mac app draws only the three role lines, 3 px |
 | Frame | Rounded card `#161616`, radius 28; light grid `#2a2a2a`; y labels `250°`, x labels per OS clock (`13:00`) |
 | Target | Light horizontal line `#d9d9d9`, labeled at the right edge outside the plot (`203°`) |
-| Scrub | Pointer over plot: vertical line + white-ringed dot per series; readout row shows the values at that time; label above graph = prediction state + time (`Predicting / 11:24`). Off the plot: `Now · 13:20` and live values. Keyboard: ←/→ moves the scrub point when the graph has focus |
-| X range | Selected probe's start to now (range buttons narrow it) |
+| Scrub | Pointer over plot: vertical line (Mac: + white-ringed dot per series); readout row shows the values at that time; label above graph = prediction state + time (`Predicting / 11:24`). Off the plot: `Now · 13:20` and live values. Keyboard: ←/→ moves the scrub point when the graph has focus |
+| X range | Selected probe's start to now (the whole cook; no range controls) |
 | Y range | Fits the visible readings and the target, padded 10%, at least 10° tall; ticks on a 1-2-5 step, at most five gaps (like the phone app) |
 | Gaps | Missing data is a break, not interpolated; hatched while backfilling |
 | Stale | Lines stop at the last sample; header shows "stale" |
@@ -325,7 +324,7 @@ macOS notification banners use `UNNotificationSound.default` (system sound names
 | History | Cook list (title, date, duration, peak); detail with stat tiles, read-only graph, alert events on the timeline and as a list; Rename, Delete |
 | Settings | Sections: General (units, prediction time with preview, menu bar, login, keep awake), Alerts and sounds (volume, Do Not Disturb, sound per event, default alerts for new probes), Devices (followed probes, MeatNet nodes), History and data, Diagnostics (links, Record session), About |
 | Instant Read · main window / kitchen | Tip temperature only, large; last 30 s sparkline; outline "Instant Read" pill |
-| Empty, error and edge states | Bluetooth off / not allowed, nothing found, probe offline, prediction stale, loading history, probe busy, command not confirmed, overheat, low battery, food safe (read-only), All 8 sensors |
+| Empty, error and edge states | Bluetooth off / not allowed, nothing found, probe offline, prediction stale, loading history, probe busy, command not confirmed, overheat, low battery, food safe (read-only) |
 | Design tokens | Colors, validated probe palette (dark + light), type scale, sound map, spacing |
 
 Completion time: the chosen format is primary; the other is always shown beside or under it, muted and smaller. Applies to every surface:

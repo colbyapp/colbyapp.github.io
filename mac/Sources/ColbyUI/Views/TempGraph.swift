@@ -4,20 +4,6 @@ import CombustionCore
 import SwiftUI
 
 /// The visible time window. `live` follows now with 30 minutes.
-public enum GraphRange: String, CaseIterable, Identifiable, Sendable {
-    case live = "Live", hour = "1h", fourHours = "4h", all = "All"
-    public var id: String { rawValue }
-
-    var span: TimeInterval? {
-        switch self {
-        case .live: 30 * 60
-        case .hour: 3600
-        case .fourHours: 4 * 3600
-        case .all: nil
-        }
-    }
-}
-
 /// The sample under the pointer while scrubbing.
 struct ScrubPoint: Equatable {
     var time: Date
@@ -44,7 +30,7 @@ struct GraphModel {
     /// °C.
     var target: Double?
 
-    init(series: TemperatureSeries?, target celsius: Double?, range: GraphRange, now: Date, width: CGFloat,
+    init(series: TemperatureSeries?, target celsius: Double?, now: Date, width: CGFloat,
          unit: TemperatureUnit) {
         let buckets = series?.downsampled(maxPoints: max(2, Int(width * 2))) ?? []
         var pts: [Point] = []
@@ -60,7 +46,8 @@ struct GraphModel {
         }
         let first = pts.first?.time ?? now.addingTimeInterval(-1800)
         let end = max(now, pts.last?.time ?? now)
-        var start = range.span.map { max(first, end.addingTimeInterval(-$0)) } ?? first
+        // The graph always shows the whole cook.
+        var start = first
         if end.timeIntervalSince(start) < 60 { start = end.addingTimeInterval(-60) }
 
         let (yMin, yMax, yStep) = Self.yAxis(
@@ -140,7 +127,6 @@ struct GraphModel {
 struct TempGraph: View {
     var series: TemperatureSeries?
     var target: Double?
-    var range: GraphRange
     var now: Date
     var format: Formatter
     @Binding var scrub: ScrubPoint?
@@ -153,7 +139,7 @@ struct TempGraph: View {
         GeometryReader { geo in
             let plot = CGRect(x: leftAxis, y: 16, width: max(1, geo.size.width - leftAxis - rightAxis),
                               height: max(1, geo.size.height - 16 - bottomAxis))
-            let model = GraphModel(series: series, target: target, range: range, now: now, width: plot.width,
+            let model = GraphModel(series: series, target: target, now: now, width: plot.width,
                                    unit: format.unit)
             Canvas { ctx, _ in draw(model, in: plot, ctx) }
                 .contentShape(Rectangle())
