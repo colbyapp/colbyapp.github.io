@@ -285,6 +285,33 @@ test('a connect attempt that hangs after open gives up at the deadline and retri
   app.stop();
 });
 
+test('reconnect backoff grows by 1.5x from 1 s and stops at 30 s', async () => {
+  const { backoffMs } = await import('../src/core/app.js');
+  assert.deepEqual([0, 1, 2, 3, 4].map(backoffMs), [1000, 1500, 2250, 3375, 5063]);
+  assert.equal(backoffMs(8), 25629);
+  assert.equal(backoffMs(9), 30000);
+  assert.equal(backoffMs(50), 30000);
+});
+
+test('picking a device again after the browser lost it connects at once with the new handle', async () => {
+  const clock = new FakeClock();
+  const probe = new SimProbe({ serial: '10005A3F', clock, startedAt: clock.now() - HOUR });
+  const lost = () => Promise.reject(new Error('Bluetooth Device is no longer in range.'));
+  const app = new ColbyApp({ clock });
+  await app.start();
+  const device = app.addDevice({ id: 'p', name: 'Probe', open: lost, identify: async () => ({ serial: probe.serial }) });
+  await settle();
+  await clock.advance(10_000);
+  assert.equal(device.state, 'reconnecting');
+  assert.match(device.error, /no longer in range/);
+  // The chooser hands back the same device id with a working handle.
+  const again = app.addDevice({ id: 'p', name: 'Probe', open: async () => new SimProbeConnection(probe) });
+  assert.equal(again, device, 'same device record');
+  await until(clock, () => device.state === 'connected');
+  assert.equal(app.devices.size, 1);
+  app.stop();
+});
+
 test('retry gives up a hung attempt instead of waiting for it', async () => {
   const clock = new FakeClock();
   const probe = new SimProbe({ serial: '10005A3F', clock, startedAt: clock.now() - HOUR });

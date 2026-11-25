@@ -15,7 +15,8 @@ import { DirectProbeLink, NodeLink } from './links.js';
 import { GATT } from '../transport/gatt.js';
 import { decodeAdvertisement } from '../codec/index.js';
 
-const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
+/** Wait before reconnect try `attempt` (0-based): 1 s, then ×1.5 each time (1, 1.5, 2.3, 3.4, 5.1 … s), at most 30 s. */
+export const backoffMs = (attempt) => Math.min(30_000, Math.round(1000 * 1.5 ** attempt));
 /**
  * Most time one connect attempt (open, discover, identify, link start) may take. Only the GATT connect has a timeout of
  * its own; after the computer wakes, Chrome can leave service discovery or the first UART reply pending for good.
@@ -80,7 +81,16 @@ export class ColbyApp extends Emitter {
   addDevice({ id, name, open, identify = null, simulated = false }) {
     const existing = this.devices.get(id);
     if (existing) {
-      if (existing.state === 'disconnected') this.#connect(existing);
+      // Picked again (e.g. after the computer slept and the browser lost the device): use the fresh handle and
+      // connect now, keeping the device's cook and history.
+      if (!existing.link) {
+        existing.open = open;
+        if (identify) existing.identify = identify;
+        if (existing.state === 'disconnected') {
+          existing.attempt = 0;
+          this.#connect(existing);
+        } else this.retry(id);
+      }
       return existing;
     }
     const device = {
@@ -229,7 +239,7 @@ export class ColbyApp extends Emitter {
 
   #scheduleRetry(d) {
     if (d.removed) return;
-    const delay = BACKOFF_MS[Math.min(d.attempt, BACKOFF_MS.length - 1)];
+    const delay = backoffMs(d.attempt);
     d.attempt++;
     d.state = 'reconnecting';
     d.nextRetryAt = this.clock.now() + delay;
