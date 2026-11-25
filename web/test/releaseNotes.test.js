@@ -22,6 +22,19 @@ test('keeps web PRs from the What\'s Changed list', () => {
   ]);
 });
 
+test('hand-written bullets from the release page', () => {
+  const body = `## What's Changed
+- Reconnecting is more reliable.
+* web: a probe shows one time only.
+- CI: faster builds.
+
+**Full Changelog**: https://github.com/o/r/compare/web-v1.0.0...web-v1.0.1`;
+  assert.deepEqual(parseReleaseNotes(body), [
+    { title: 'Reconnecting is more reliable.', url: null },
+    { title: 'A probe shows one time only.', url: null },
+  ]);
+});
+
 test('empty or missing notes', () => {
   assert.deepEqual(parseReleaseNotes(''), []);
   assert.deepEqual(parseReleaseNotes(undefined), []);
