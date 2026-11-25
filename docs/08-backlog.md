@@ -42,6 +42,10 @@ Status: `open` (not started), `blocked` (needs info), `doing`, `done`.
    Display already connected (`00:57:36:27:81:11 – Paired`), not the probe. So the probe was in range and seen by Chrome,
    but did not match the chooser filter: cause 2 is back on the table. (bluetooth-internals may show services from an
    earlier GATT discovery, not from the advertisement.)
+3. Later the same day (branch `worktree-web-i1-chooser`, stale links released before the chooser) the **filtered**
+   chooser listed the probe: `[Colby] picked unnamed device (XcItg8E322jXRfMy7/SfgQ==) from the filtered chooser`. So
+   the filter matches the probe, and cause 2 is unlikely. Findings 1 and 2 were most likely the probe not advertising
+   (asleep, or not yet back after the Mac slept) or a link held from before; which one is not known.
 
 **Next:** with the probe showing in bluetooth-internals, open an `acceptAllDevices` chooser from the DevTools console. If
 it lists the probe, do F-3 as a "Show all devices" chooser (`acceptAllDevices` plus `optionalManufacturerData: [0x09C7]`);
