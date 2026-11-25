@@ -308,7 +308,7 @@ $('reconnect-band').addEventListener('click', (e) => {
   const b = e.target.closest('[data-band]');
   if (!b) return;
   if (b.dataset.band === 'retry') {
-    releaseStaleLinks();
+    releaseStaleLinks({ evenConnecting: true });
     app.reconnectAll();
   } else devicesDialog();
 });
@@ -1127,9 +1127,17 @@ async function identify(device, connection, isProbe) {
  */
 const bleDevices = new Map();
 
-/** Releases Chrome's link to every device Colby has no live link to; a stale one can hide it from the chooser (I-1). */
-function releaseStaleLinks() {
-  for (const [id, device] of bleDevices) if (!app.devices.get(id)?.link) ble.releaseDevice(device);
+/**
+ * Releases Chrome's link to every device Colby has no live link to; a stale one can hide it from the chooser (I-1).
+ * A device still connecting is left alone (releasing cancels its GATT connect: "The GATT connect attempt was
+ * cancelled"), unless `evenConnecting`: before a reconnect, which replaces that attempt anyway.
+ */
+function releaseStaleLinks({ evenConnecting = false } = {}) {
+  for (const [id, device] of bleDevices) {
+    const d = app.devices.get(id);
+    if (d?.link || (!evenConnecting && d?.attemptStartedAt != null)) continue;
+    ble.releaseDevice(device);
+  }
 }
 
 /**
@@ -1358,7 +1366,7 @@ addEventListener('pageshow', (e) => {
 function onWake(reason) {
   if (![...app.devices.values()].some((d) => !d.simulated)) return;
   state.wake = { reason, at: Date.now() };
-  releaseStaleLinks();
+  releaseStaleLinks({ evenConnecting: true });
   app.reconnectAll();
   renderReconnectBand();
 }
