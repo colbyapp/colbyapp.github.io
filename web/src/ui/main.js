@@ -797,7 +797,7 @@ function settingsDialog() {
       </ul>
       <p class="note">Items marked – need chrome://flags/#enable-experimental-web-platform-features.</p>
     </fieldset>
-    <p class="note">Colby is open source: <a href="https://github.com/byee01/colby" target="_blank" rel="noopener">github.com/byee01/colby</a></p>
+    <p class="note">Colby is open source: <a href="https://github.com/colbyapp/colbyapp.github.io" target="_blank" rel="noopener">github.com/colbyapp/colbyapp.github.io</a></p>
     <div class="row"><button class="btn danger" data-do="wipe">Delete all data</button><button class="btn" data-do="close">Done</button></div>`, {
     close: closeDialog,
     test: () => sound.test('ready'),

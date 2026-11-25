@@ -73,7 +73,7 @@ Billing facts (private repo), from [GitHub docs](https://docs.github.com/en/bill
 - Public repos: standard GitHub-hosted runners are free.
 
 Owner checklist, in order:
-1. Open a failed run (e.g. https://github.com/byee01/colby/actions/runs/39106182658) and read the error banner; it is the only place the real reason appears.
+1. Open a failed run (e.g. https://github.com/colbyapp/colbyapp.github.io/actions/runs/39106182658) and read the error banner; it is the only place the real reason appears.
 2. Settings → Actions → General: Actions enabled; allowed actions include `actions/checkout`, `actions/setup-dotnet` (or allow all).
 3. Settings → Billing → Actions: minutes used; set a small spending limit if exhausted.
 4. Still failing: merge the workflow files to `main` (workflows register from the default branch), or make the repo public.

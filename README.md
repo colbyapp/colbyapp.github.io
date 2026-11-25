@@ -4,7 +4,7 @@
 
 Monitor Combustion thermometers from your computer.
 
-- `web/`: browser version (Chrome or Edge)
+- `web/`: browser version (Chrome or Edge), live at https://colbyapp.github.io/
 - `mac/`: macOS app
 - `windows/`: Windows port
 - `docs/`: plans and protocol notes. Logo source art is in `docs/design/logo/`.
